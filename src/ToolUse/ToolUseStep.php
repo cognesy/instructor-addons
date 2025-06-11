@@ -2,10 +2,10 @@
 
 namespace Cognesy\Addons\ToolUse;
 
-use Cognesy\Polyglot\LLM\Data\LLMResponse;
-use Cognesy\Polyglot\LLM\Data\ToolCalls;
-use Cognesy\Polyglot\LLM\Data\Usage;
-use Cognesy\Polyglot\LLM\Enums\LLMFinishReason;
+use Cognesy\Polyglot\Inference\Data\InferenceResponse;
+use Cognesy\Polyglot\Inference\Data\ToolCalls;
+use Cognesy\Polyglot\Inference\Data\Usage;
+use Cognesy\Polyglot\Inference\Enums\InferenceFinishReason;
 use Cognesy\Utils\Messages\Messages;
 use Throwable;
 
@@ -16,22 +16,22 @@ class ToolUseStep
     private ?ToolExecutions $toolExecutions;
     private ?Messages $messages;
     private ?Usage $usage;
-    private ?LLMResponse $llmResponse;
+    private ?InferenceResponse $inferenceResponse;
 
     public function __construct(
-        string         $response = '',
-        ?ToolCalls      $toolCalls = null,
-        ?ToolExecutions $toolExecutions = null,
-        ?Messages       $messages = null,
-        ?Usage          $usage = null,
-        ?LLMResponse    $llmResponse = null,
+        string             $response = '',
+        ?ToolCalls         $toolCalls = null,
+        ?ToolExecutions    $toolExecutions = null,
+        ?Messages          $messages = null,
+        ?Usage             $usage = null,
+        ?InferenceResponse $inferenceResponse = null,
     ) {
         $this->response = $response;
         $this->toolCalls = $toolCalls;
         $this->toolExecutions = $toolExecutions;
         $this->messages = $messages;
         $this->usage = $usage;
-        $this->llmResponse = $llmResponse;
+        $this->inferenceResponse = $inferenceResponse;
     }
 
     public function response() : string {
@@ -50,12 +50,12 @@ class ToolUseStep
         return $this->usage ?? new Usage();
     }
 
-    public function finishReason() : ?LLMFinishReason {
-        return $this->llmResponse?->finishReason();
+    public function finishReason() : ?InferenceFinishReason {
+        return $this->inferenceResponse?->finishReason();
     }
 
-    public function llmResponse() : ?LLMResponse {
-        return $this->llmResponse;
+    public function inferenceResponse() : ?InferenceResponse {
+        return $this->inferenceResponse;
     }
 
     // HANDLE TOOL CALLS ////////////////////////////////////////////

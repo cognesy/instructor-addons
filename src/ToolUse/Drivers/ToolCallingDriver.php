@@ -7,10 +7,10 @@ use Cognesy\Addons\ToolUse\ToolExecution;
 use Cognesy\Addons\ToolUse\ToolExecutions;
 use Cognesy\Addons\ToolUse\ToolUseContext;
 use Cognesy\Addons\ToolUse\ToolUseStep;
-use Cognesy\Polyglot\LLM\Data\ToolCall;
-use Cognesy\Polyglot\LLM\Enums\OutputMode;
-use Cognesy\Polyglot\LLM\Inference;
-use Cognesy\Polyglot\LLM\LLM;
+use Cognesy\Polyglot\Inference\Data\ToolCall;
+use Cognesy\Polyglot\Inference\Enums\OutputMode;
+use Cognesy\Polyglot\Inference\Inference;
+use Cognesy\Polyglot\Inference\LLMProvider;
 use Cognesy\Utils\Json\Json;
 use Cognesy\Utils\Messages\Message;
 use Cognesy\Utils\Messages\Messages;
@@ -26,7 +26,7 @@ use Cognesy\Utils\Result\Success;
  */
 class ToolCallingDriver implements CanUseTools
 {
-    private LLM $llm;
+    private LLMProvider $llm;
     private string|array $toolChoice;
     private string $model;
     private array $responseFormat;
@@ -35,14 +35,14 @@ class ToolCallingDriver implements CanUseTools
     private bool $parallelToolCalls = false;
 
     public function __construct(
-        ?LLM         $llm = null,
+        ?LLMProvider $llm = null,
         string|array $toolChoice = 'auto',
         array        $responseFormat = [],
         string       $model = '',
         array        $options = [],
         OutputMode   $mode = OutputMode::Tools,
     ) {
-        $this->llm = $llm ?? new LLM();
+        $this->llm = $llm ?? LLMProvider::new();
 
         $this->toolChoice = $toolChoice;
         $this->model = $model;
@@ -63,9 +63,9 @@ class ToolCallingDriver implements CanUseTools
         $messages = $context->messages();
         $tools = $context->tools();
 
-        $llmResponse = (new Inference)
-            ->withLLM($this->llm)
-            ->create(
+        $inferenceResponse = (new Inference)
+            ->withLLMProvider($this->llm)
+            ->with(
                 messages: $messages->toArray(),
                 model: $this->model,
                 tools: $tools->toToolSchema(),
@@ -79,16 +79,16 @@ class ToolCallingDriver implements CanUseTools
             )
             ->response();
 
-        $toolExecutions = $tools->useTools($llmResponse->toolCalls(), $context);
+        $toolExecutions = $tools->useTools($inferenceResponse->toolCalls(), $context);
         $followUpMessages = $this->makeFollowUpMessages($toolExecutions);
 
         return new ToolUseStep(
-            response: $llmResponse->content(),
-            toolCalls: $llmResponse->toolCalls(),
+            response: $inferenceResponse->content(),
+            toolCalls: $inferenceResponse->toolCalls(),
             toolExecutions: $toolExecutions,
             messages: $followUpMessages,
-            usage: $llmResponse->usage(),
-            llmResponse: $llmResponse,
+            usage: $inferenceResponse->usage(),
+            inferenceResponse: $inferenceResponse,
         );
     }
 
