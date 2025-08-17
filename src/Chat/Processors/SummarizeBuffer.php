@@ -1,14 +1,15 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace Cognesy\Addons\Chat\Processors;
 
 use Cognesy\Addons\Chat\Contracts\CanSummarizeMessages;
 use Cognesy\Addons\Chat\Contracts\ScriptProcessor;
-use Cognesy\Template\Script\Script;
 use Cognesy\Messages\Messages;
+use Cognesy\Template\Script\Script;
 use Cognesy\Utils\Tokenizer;
 
-class SummarizeBuffer implements ScriptProcessor {
+class SummarizeBuffer implements ScriptProcessor
+{
     private string $sourceSection;
     private string $targetSection;
     private int $maxBufferTokens;
