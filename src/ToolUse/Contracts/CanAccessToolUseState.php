@@ -4,7 +4,7 @@ namespace Cognesy\Addons\ToolUse\Contracts;
 
 use Cognesy\Addons\ToolUse\ToolUseState;
 
-interface CanDecideToContinue
+interface CanAccessToolUseState
 {
-    public function canContinue(ToolUseState $state) : bool;
+    public function withState(ToolUseState $state): self;
 }
