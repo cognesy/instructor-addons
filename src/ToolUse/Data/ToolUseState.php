@@ -1,10 +1,12 @@
 <?php declare(strict_types=1);
 
-namespace Cognesy\Addons\ToolUse;
+namespace Cognesy\Addons\ToolUse\Data;
 
 use Cognesy\Addons\ToolUse\Enums\ToolUseStatus;
+use Cognesy\Addons\ToolUse\Tools;
 use Cognesy\Messages\Messages;
 use Cognesy\Polyglot\Inference\Data\Usage;
+use DateTimeImmutable;
 
 class ToolUseState
 {
@@ -18,6 +20,8 @@ class ToolUseState
     private ?ToolUseStep $currentStep = null;
 
     private Usage $usage;
+    private DateTimeImmutable $startedAt;
+    private ?ToolUseOptions $options = null;
 
     public function __construct(
         ?Tools $tools = null,
@@ -25,6 +29,7 @@ class ToolUseState
         $this->tools = $tools ?? new Tools();
         $this->messages = Messages::empty();
         $this->usage = new Usage();
+        $this->startedAt = new DateTimeImmutable();
     }
 
     // HANDLE STEPS ////////////////////////////////////////////////
@@ -61,7 +66,7 @@ class ToolUseState
     }
 
     public function appendMessages(Messages $messages) {
-        $this->messages->appendMessages($messages);
+        $this->messages = $this->messages->appendMessages($messages);
     }
 
     // HANDLE TOOLS ////////////////////////////////////////////////
@@ -82,6 +87,22 @@ class ToolUseState
 
     public function accumulateUsage(Usage $usage) {
         $this->usage->accumulate($usage);
+    }
+
+    // HANDLE TIMING //////////////////////////////////////////////
+
+    public function startedAt() : DateTimeImmutable {
+        return $this->startedAt;
+    }
+
+    // HANDLE OPTIONS /////////////////////////////////////////////
+
+    public function withOptions(?ToolUseOptions $options) : void {
+        $this->options = $options;
+    }
+
+    public function options() : ?ToolUseOptions {
+        return $this->options;
     }
 
     // HANDLE VARIABLES ////////////////////////////////////////////

@@ -4,8 +4,13 @@ namespace Cognesy\Addons\Chat;
 
 use Cognesy\Messages\Message;
 use Cognesy\Messages\Messages;
-use Cognesy\Template\Script\Script;
+use Cognesy\Messages\Script\Script;
 
+/**
+ * @deprecated Use Cognesy\\Addons\\Chat\\Chat with script processors
+ *             via withScriptProcessors(...). This pipeline wrapper will be
+ *             removed in a future release.
+ */
 class ScriptPipeline
 {
     private array $sections;
@@ -19,7 +24,7 @@ class ScriptPipeline
 
         // Initialize all sections
         foreach ($sections as $section) {
-            $this->script->section($section);
+            $this->script = $this->script->withSection($section);
         }
     }
 
@@ -29,12 +34,12 @@ class ScriptPipeline
     }
 
     public function appendMessage(Message $message, string $section): self {
-        $this->script->section($section)->appendMessage($message);
+        $this->script = $this->script->appendMessageToSection($section, $message);
         return $this->process();
     }
 
     public function appendMessages(Messages $messages, string $section): self {
-        $this->script->section($section)->appendMessages($messages);
+        $this->script = $this->script->withSectionMessages($section, $messages);
         return $this->process();
     }
 

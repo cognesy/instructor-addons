@@ -5,7 +5,7 @@ namespace Cognesy\Addons\Chat\Processors;
 use Cognesy\Addons\Chat\Contracts\CanSummarizeMessages;
 use Cognesy\Addons\Chat\Contracts\ScriptProcessor;
 use Cognesy\Messages\Messages;
-use Cognesy\Template\Script\Script;
+use Cognesy\Messages\Script\Script;
 use Cognesy\Utils\Tokenizer;
 
 class SummarizeBuffer implements ScriptProcessor
@@ -49,11 +49,20 @@ class SummarizeBuffer implements ScriptProcessor
         foreach ($script->sections() as $section) {
             $sectionName = $section->name();
             if ($sectionName === $this->sourceSection) {
-                $newScript->section($sectionName)->clear();
+                // clear source section immutably
+                $newScript = $newScript->replaceSection(
+                    $sectionName,
+                    $newScript->withSection($sectionName)->section($sectionName)->clear()
+                );
             } elseif ($sectionName === $this->targetSection) {
-                $newScript->section($sectionName)->withMessages(Messages::fromString($summary));
+                // set summary immutably
+                $newScript = $newScript->withSectionMessages($sectionName, Messages::fromString($summary));
             } else {
-                $newScript->section($sectionName)->copyFrom($script->section($sectionName));
+                // copy other sections immutably
+                $newScript = $newScript->replaceSection(
+                    $sectionName,
+                    $newScript->withSection($sectionName)->section($sectionName)->copyFrom($script->section($sectionName))
+                );
             }
         }
 
