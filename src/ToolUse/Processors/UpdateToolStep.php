@@ -2,14 +2,15 @@
 
 namespace Cognesy\Addons\ToolUse\Processors;
 
-use Cognesy\Addons\ToolUse\Contracts\CanProcessStep;
+use Cognesy\Addons\ToolUse\Contracts\CanProcessToolStep;
 use Cognesy\Addons\ToolUse\Data\ToolUseState;
 use Cognesy\Addons\ToolUse\Data\ToolUseStep;
 
-class AppendStepMessages implements CanProcessStep
+class UpdateToolStep implements CanProcessToolStep
 {
     public function processStep(ToolUseStep $step, ToolUseState $state): ToolUseStep {
-        $state->appendMessages($step->messages());
+        $state->addStep($step);
+        $state->setCurrentStep($step);
         return $step;
     }
 }

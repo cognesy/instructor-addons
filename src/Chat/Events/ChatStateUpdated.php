@@ -4,5 +4,5 @@ namespace Cognesy\Addons\Chat\Events;
 
 use Cognesy\Events\Event;
 
-final class ChatContextTransformed extends Event {}
+final class ChatStateUpdated extends Event {}
 

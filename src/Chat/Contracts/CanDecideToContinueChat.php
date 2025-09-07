@@ -4,7 +4,7 @@ namespace Cognesy\Addons\Chat\Contracts;
 
 use Cognesy\Addons\Chat\Data\ChatState;
 
-interface CanDecideToContinue
+interface CanDecideToContinueChat
 {
     public function canContinue(ChatState $state) : bool;
 }

@@ -1,15 +1,17 @@
 <?php declare(strict_types=1);
 
-namespace Cognesy\Addons\ToolUse\Data;
+namespace Cognesy\Addons\ToolUse\Data\Collections;
 
-use Cognesy\Addons\ToolUse\Contracts\CanProcessStep;
+use Cognesy\Addons\ToolUse\Contracts\CanProcessToolStep;
+use Cognesy\Addons\ToolUse\Data\ToolUseState;
+use Cognesy\Addons\ToolUse\Data\ToolUseStep;
 
 final class StepProcessors
 {
-    /** @var CanProcessStep[] */
+    /** @var CanProcessToolStep[] */
     private array $items = [];
 
-    public function add(CanProcessStep ...$processors) : self {
+    public function add(CanProcessToolStep ...$processors) : self {
         foreach ($processors as $processor) {
             $this->items[] = $processor;
         }

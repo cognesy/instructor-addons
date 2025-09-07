@@ -1,15 +1,16 @@
 <?php declare(strict_types=1);
 
-namespace Cognesy\Addons\ToolUse\Data;
+namespace Cognesy\Addons\ToolUse\Data\Collections;
 
-use Cognesy\Addons\ToolUse\Contracts\CanDecideToContinue;
+use Cognesy\Addons\ToolUse\Contracts\CanDecideToContinueToolUse;
+use Cognesy\Addons\ToolUse\Data\ToolUseState;
 
 final class ContinuationCriteria
 {
-    /** @var CanDecideToContinue[] */
+    /** @var CanDecideToContinueToolUse[] */
     private array $items = [];
 
-    public function add(CanDecideToContinue ...$criteria) : self {
+    public function add(CanDecideToContinueToolUse ...$criteria) : self {
         foreach ($criteria as $criterion) {
             $this->items[] = $criterion;
         }
