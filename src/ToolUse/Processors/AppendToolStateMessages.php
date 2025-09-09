@@ -4,15 +4,16 @@ namespace Cognesy\Addons\ToolUse\Processors;
 
 use Cognesy\Addons\ToolUse\Contracts\CanProcessToolState;
 use Cognesy\Addons\ToolUse\Data\ToolUseState;
-use Cognesy\Polyglot\Inference\Data\Usage;
+use Cognesy\Messages\Messages;
 
-class AccumulateTokenUsage implements CanProcessToolState
+class AppendToolStateMessages implements CanProcessToolState
 {
     public function process(ToolUseState $state, ?callable $next = null): ToolUseState {
-        $newState = $state->accumulateUsage(
-            $state->currentStep()?->usage() ?? Usage::none()
-        );
-
+        $newMessages = $state->currentStep()?->messages() ?? Messages::empty();
+        $newState = match(true) {
+            $newMessages->isEmpty() => $state,
+            default => $state->appendMessages($newMessages)
+        };
         return $next ? $next($newState) : $newState;
     }
 }

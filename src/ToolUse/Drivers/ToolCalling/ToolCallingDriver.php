@@ -6,6 +6,7 @@ use Cognesy\Addons\ToolUse\Contracts\CanUseTools;
 use Cognesy\Addons\ToolUse\Data\Collections\ToolExecutions;
 use Cognesy\Addons\ToolUse\Data\ToolUseState;
 use Cognesy\Addons\ToolUse\Data\ToolUseStep;
+use Cognesy\Addons\ToolUse\Enums\StepType;
 use Cognesy\Addons\ToolUse\Formatters\ToolExecutionFormatter;
 use Cognesy\Addons\ToolUse\Tools;
 use Cognesy\Http\HttpClient;
@@ -59,12 +60,12 @@ class ToolCallingDriver implements CanUseTools
      * @param ToolUseState $state The context containing messages, tools, and other related information required for tool usage.
      * @return ToolUseStep Returns an instance of ToolUseStep containing the response, executed tools, follow-up messages, and additional usage data.
      */
-    public function useTools(ToolUseState $state) : ToolUseStep {
-        $pending = $this->buildPendingInference($state->messages(), $state->tools());
+    public function useTools(ToolUseState $state, Tools $tools) : ToolUseStep {
+        $pending = $this->buildPendingInference($state->messages(), $tools);
         $response = $pending->response();
-        $executions = $state->tools()->useTools($response->toolCalls(), $state);
-        $followUps = $this->formatter->followUpMessages($executions);
-        return $this->buildStepFromResponse($response, $executions, $followUps);
+        $executions = $tools->useTools($response->toolCalls(), $state);
+        $messages = $this->formatter->makeExecutionMessages($executions);
+        return $this->buildStepFromResponse($response, $executions, $messages);
     }
 
     // INTERNAL /////////////////////////////////////////////////
@@ -102,6 +103,15 @@ class ToolCallingDriver implements CanUseTools
             messages: $followUps,
             usage: $response->usage(),
             inferenceResponse: $response,
+            stepType: $this->inferStepType($response, $executions)
         );
+    }
+
+    private function inferStepType(InferenceResponse $response, ToolExecutions $executions) : StepType {
+        return match(true) {
+            $executions->hasErrors() => StepType::Error,
+            $response->hasToolCalls() > 0 => StepType::ToolExecution,
+            default => StepType::FinalResponse,
+        };
     }
 }

@@ -25,17 +25,22 @@ it('continues loop on tool failure and formats error message', function () {
         ),
     ]);
 
-    $toolUse = (new ToolUse)
-        ->withDriver(new ToolCallingDriver(llm: \Cognesy\Polyglot\Inference\LLMProvider::new()->withDriver($driver)))
-        ->withMessages('Test failure handling')
-        ->withTools([
-            FunctionTool::fromCallable(_sum(...)),
-        ]);
+    $tools = (new \Cognesy\Addons\ToolUse\Tools())
+        ->withTool(FunctionTool::fromCallable(_sum(...)));
+        
+    $state = (new \Cognesy\Addons\ToolUse\Data\ToolUseState())
+        ->withMessages(\Cognesy\Messages\Messages::fromString('Test failure handling'));
+        
+    $toolUse = new ToolUse(
+        tools: $tools,
+        driver: new ToolCallingDriver(llm: \Cognesy\Polyglot\Inference\LLMProvider::new()->withDriver($driver))
+    );
 
-    $step = $toolUse->nextStep();
+    $state = $toolUse->nextStep($state);
+    $step = $state->currentStep();
 
     expect($step->toolExecutions()->hasErrors())->toBeTrue();
-    $msgs = $step->messages()->toArray();
+    $msgs = $state->messages()->toArray();
     $invocationNames = [];
     foreach ($msgs as $m) {
         $invocationNames[] = $m['_metadata']['tool_calls'][0]['function']['name'] ?? null;
@@ -53,8 +58,8 @@ it('stops on configured finish reasons (FinishReasonCheck)', function () {
     $state = new ToolUseState();
     $resp = new InferenceResponse(content: '', finishReason: 'stop');
     $step = new ToolUseStep('', null, null, null, null, $resp);
-    $state->addStep($step);
-    $state->setCurrentStep($step);
+    $state = $state->withAddedStep($step);
+    $state->withCurrentStep($step);
 
     $check = new FinishReasonCheck([InferenceFinishReason::Stop]);
     expect($check->canContinue($state))->toBeFalse();
@@ -63,7 +68,7 @@ it('stops on configured finish reasons (FinishReasonCheck)', function () {
 it('limits retries based on consecutive failed steps (RetryLimit)', function () {
     $state = new ToolUseState();
     // success step (no errors): empty tool executions
-    $state->addStep(new ToolUseStep());
+    $state = $state->withAddedStep(new ToolUseStep());
     // failed steps: emulate by creating ToolUseStep with error executions
     $failedExecs = new \Cognesy\Addons\ToolUse\Data\Collections\ToolExecutions([
         new \Cognesy\Addons\ToolUse\Data\ToolExecution(
@@ -75,9 +80,9 @@ it('limits retries based on consecutive failed steps (RetryLimit)', function () 
     ]);
     $failedStep1 = new ToolUseStep('', null, $failedExecs);
     $failedStep2 = new ToolUseStep('', null, $failedExecs);
-    $state->addStep($failedStep1);
-    $state->addStep($failedStep2);
-    $state->setCurrentStep($failedStep2);
+    $state = $state->withAddedStep($failedStep1);
+    $state = $state->withAddedStep($failedStep2);
+    $state = $state->withCurrentStep($failedStep2);
 
     $limit = new RetryLimit(2);
     expect($limit->canContinue($state))->toBeFalse(); // tail failures == maxRetries => stop
