@@ -1,8 +1,11 @@
 <?php declare(strict_types=1);
 
+use Cognesy\Addons\ToolUse\Data\ToolUseState;
 use Cognesy\Addons\ToolUse\Drivers\ToolCalling\ToolCallingDriver;
+use Cognesy\Addons\ToolUse\Tools;
 use Cognesy\Addons\ToolUse\Tools\FunctionTool;
-use Cognesy\Addons\ToolUse\ToolUse;
+use Cognesy\Addons\ToolUse\ToolUseFactory;
+use Cognesy\Messages\Messages;
 use Cognesy\Polyglot\Inference\Data\InferenceResponse;
 use Cognesy\Polyglot\Inference\Data\ToolCall;
 use Cognesy\Polyglot\Inference\Data\ToolCalls;
@@ -22,14 +25,14 @@ it('executes a tool call and builds follow-up messages', function () {
         ),
     ]);
 
-    $tools = (new \Cognesy\Addons\ToolUse\Tools())
+    $tools = (new Tools())
         ->withTool(FunctionTool::fromCallable(add_numbers(...)))
         ->withTool(FunctionTool::fromCallable(subtract_numbers(...)));
         
-    $state = (new \Cognesy\Addons\ToolUse\Data\ToolUseState())
-        ->withMessages(\Cognesy\Messages\Messages::fromString('Add numbers'));
+    $state = (new ToolUseState())
+        ->withMessages(Messages::fromString('Add numbers'));
         
-    $toolUse = new ToolUse(
+    $toolUse = ToolUseFactory::default(
         tools: $tools,
         driver: new ToolCallingDriver(llm: LLMProvider::new()->withDriver($driver))
     );
@@ -37,9 +40,9 @@ it('executes a tool call and builds follow-up messages', function () {
     $newState = $toolUse->nextStep($state);
     $step = $newState->currentStep();
 
-    expect($step->hasToolCalls())->toBeTrue();
-    expect(count($step->toolExecutions()->all()))->toBe(1);
-    expect($step->messages()->count())->toBeGreaterThan(0);
+    expect($step?->hasToolCalls())->toBeTrue();
+    expect(count($step?->toolExecutions()->all()))->toBe(1);
+    expect($step?->messages()->count())->toBeGreaterThan(0);
 });
 
 it('iterates until no more tool calls and returns final response', function () {
@@ -51,13 +54,13 @@ it('iterates until no more tool calls and returns final response', function () {
         new InferenceResponse(content: '5'),
     ]);
 
-    $tools = (new \Cognesy\Addons\ToolUse\Tools())
+    $tools = (new Tools())
         ->withTool(FunctionTool::fromCallable(add_numbers(...)));
         
-    $state = (new \Cognesy\Addons\ToolUse\Data\ToolUseState())
-        ->withMessages(\Cognesy\Messages\Messages::fromString('Add then report the result'));
+    $state = (new ToolUseState())
+        ->withMessages(Messages::fromString('Add then report the result'));
         
-    $toolUse = new ToolUse(
+    $toolUse = ToolUseFactory::default(
         tools: $tools,
         driver: new ToolCallingDriver(llm: LLMProvider::new()->withDriver($driver))
     );

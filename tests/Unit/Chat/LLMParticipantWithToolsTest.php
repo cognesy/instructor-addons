@@ -4,18 +4,18 @@ use Cognesy\Addons\Chat\Data\ChatState;
 use Cognesy\Addons\Chat\Events\ChatToolUseCompleted;
 use Cognesy\Addons\Chat\Events\ChatToolUseStarted;
 use Cognesy\Addons\Chat\Participants\LLMParticipantWithTools;
+use Cognesy\Addons\ToolUse\Drivers\ToolCalling\ToolCallingDriver;
 use Cognesy\Addons\ToolUse\Tools;
 use Cognesy\Addons\ToolUse\Tools\FunctionTool;
-use Cognesy\Addons\ToolUse\ToolUse;
+use Cognesy\Addons\ToolUse\ToolUseFactory;
 use Cognesy\Events\EventBusResolver;
-use Cognesy\Messages\Message;
 use Cognesy\Messages\Messages;
 use Cognesy\Messages\MessageStore\MessageStore;
 use Cognesy\Polyglot\Inference\Data\InferenceResponse;
 use Cognesy\Polyglot\Inference\Data\ToolCall;
 use Cognesy\Polyglot\Inference\Data\ToolCalls;
 use Cognesy\Polyglot\Inference\Data\Usage;
-use Cognesy\Polyglot\Inference\Inference;
+use Cognesy\Polyglot\Inference\LLMProvider;
 use Tests\Addons\Support\FakeInferenceDriver;
 
 require_once __DIR__ . '/../../Support/FakeInferenceDriver.php';
@@ -29,7 +29,7 @@ function test_multiply(int $a, int $b): int {
 }
 
 it('creates participant with correct name and system prompt', function () {
-    $toolUse = new ToolUse();
+    $toolUse = ToolUseFactory::default();
     $participant = new LLMParticipantWithTools(
         toolUse: $toolUse,
         name: 'test-assistant',
@@ -61,16 +61,16 @@ it('executes tool calls and returns chat step with tool results', function () {
         FunctionTool::fromCallable(test_add(...))
     );
 
-    $toolUse = new ToolUse(
+    $toolUse = ToolUseFactory::default(
         tools: $tools,
-        driver: new \Cognesy\Addons\ToolUse\Drivers\ToolCalling\ToolCallingDriver(
-            llm: \Cognesy\Polyglot\Inference\LLMProvider::new()->withDriver($driver)
+        driver: new ToolCallingDriver(
+            llm: LLMProvider::new()->withDriver($driver)
         )
     );
 
     $participant = new LLMParticipantWithTools(
+        name: 'math-assistant',
         toolUse: $toolUse,
-        name: 'math-assistant'
     );
 
     $messages = Messages::fromArray([
@@ -115,10 +115,10 @@ it('handles multiple tool calls in sequence', function () {
         FunctionTool::fromCallable(test_multiply(...))
     );
 
-    $toolUse = new ToolUse(
+    $toolUse = ToolUseFactory::default(
         tools: $tools,
-        driver: new \Cognesy\Addons\ToolUse\Drivers\ToolCalling\ToolCallingDriver(
-            llm: \Cognesy\Polyglot\Inference\LLMProvider::new()->withDriver($driver)
+        driver: new ToolCallingDriver(
+            llm: LLMProvider::new()->withDriver($driver)
         )
     );
 
@@ -150,10 +150,10 @@ it('prepends system prompt when provided', function () {
         )
     ]);
 
-    $toolUse = new ToolUse(
+    $toolUse = ToolUseFactory::default(
         tools: new Tools(),
-        driver: new \Cognesy\Addons\ToolUse\Drivers\ToolCalling\ToolCallingDriver(
-            llm: \Cognesy\Polyglot\Inference\LLMProvider::new()->withDriver($driver)
+        driver: new ToolCallingDriver(
+            llm: LLMProvider::new()->withDriver($driver)
         )
     );
 
@@ -185,10 +185,10 @@ it('works without system prompt', function () {
         )
     ]);
 
-    $toolUse = new ToolUse(
+    $toolUse = ToolUseFactory::default(
         tools: new Tools(),
-        driver: new \Cognesy\Addons\ToolUse\Drivers\ToolCalling\ToolCallingDriver(
-            llm: \Cognesy\Polyglot\Inference\LLMProvider::new()->withDriver($driver)
+        driver: new ToolCallingDriver(
+            llm: LLMProvider::new()->withDriver($driver)
         )
     );
 
@@ -230,10 +230,10 @@ it('dispatches tool use events', function () {
         )
     ]);
 
-    $toolUse = new ToolUse(
+    $toolUse = ToolUseFactory::default(
         tools: new Tools(),
-        driver: new \Cognesy\Addons\ToolUse\Drivers\ToolCalling\ToolCallingDriver(
-            llm: \Cognesy\Polyglot\Inference\LLMProvider::new()->withDriver($driver)
+        driver: new ToolCallingDriver(
+            llm: LLMProvider::new()->withDriver($driver)
         )
     );
 
