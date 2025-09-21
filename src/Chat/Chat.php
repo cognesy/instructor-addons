@@ -15,14 +15,24 @@ use Cognesy\Addons\Chat\Events\ChatStepCompleted;
 use Cognesy\Addons\Chat\Events\ChatStepStarting;
 use Cognesy\Addons\Chat\Exceptions\ChatException;
 use Cognesy\Addons\Chat\Exceptions\ChatStepFailed;
-use Cognesy\Addons\Core\Continuation\ContinuationCriteria;
-use Cognesy\Addons\Core\Contracts\CanApplyProcessors;
+use Cognesy\Addons\StepByStep\Continuation\ContinuationCriteria;
+use Cognesy\Addons\StepByStep\StateProcessing\CanApplyProcessors;
+use Cognesy\Addons\StepByStep\StepByStep;
 use Cognesy\Events\Contracts\CanHandleEvents;
 use Cognesy\Events\EventBusResolver;
-use Generator;
 use Throwable;
 
-final readonly class Chat
+/**
+ * Orchestrates a multi-turn chat between various participants.
+ * 
+ * Participants can be humans, AI models, or other entities capable of contributing to the conversation.
+ * The chat continues until a specified continuation criteria is no longer met.
+ * Each turn involves selecting the next participant, allowing them to contribute,
+ * and updating the chat state accordingly.
+ *
+ * @extends StepByStep<ChatState, ChatStep>
+ */
+final readonly class Chat extends StepByStep
 {
     private Participants $participants;
     private CanChooseNextParticipant $nextParticipantSelector;
@@ -47,60 +57,37 @@ final readonly class Chat
         $this->events = EventBusResolver::using($events);
     }
 
-    public function nextStep(ChatState $state): ChatState {
-        if (!$this->hasNextStep($state)) {
-            $this->emitChatCompleted($state);
-            return $state;
-        }
-
-        try {
-            $nextStep = $this->makeNextStep($state);
-        } catch (Throwable $error) {
-            return $this->handleFailure($error, $state);
-        }
-
-        return $this->updateState($nextStep, $state);
-    }
-
-    public function hasNextStep(ChatState $state): bool {
-        return $this->continuationCriteria->canContinue($state) ?? false;
-    }
-
-    public function finalStep(ChatState $state): ChatState {
-        while ($this->hasNextStep($state)) {
-            $state = $this->nextStep($state);
-        }
-        return $state;
-    }
-
-    /** @return Generator<ChatState> */
-    public function iterator(ChatState $state): iterable {
-        while ($this->hasNextStep($state)) {
-            $state = $this->nextStep($state);
-            yield $state;
-        }
-    }
-
     // INTERNAL ////////////////////////////////////////////
 
-    private function makeNextStep(ChatState $state) : ChatStep {
+    protected function makeNextStep(object $state): ChatStep {
+        assert($state instanceof ChatState);
         $this->emitChatTurnStarting($state);
         $participant = $this->selectParticipant($state);
         $this->emitChatBeforeSend($participant, $state);
         return $participant->act($state);
     }
 
-    private function updateState(ChatStep $step, ChatState $state) : ChatState {
+    protected function updateState($nextStep, object $state): ChatState {
+        assert($state instanceof ChatState);
+        assert($nextStep instanceof ChatStep);
+
         $newState = $state
-            ->withAddedStep($step)
-            ->withCurrentStep($step);
+            ->withAddedStep($nextStep)
+            ->withCurrentStep($nextStep);
         $newState = $this->stepProcessors->apply($newState);
         $this->emitChatStateUpdated($newState, $state);
         $this->emitChatTurnCompleted($newState);
         return $newState;
     }
 
-    private function handleFailure(Throwable $error, ChatState $state) : ChatState {
+    protected function handleNoNextStep(object $state): ChatState {
+        assert($state instanceof ChatState);
+        $this->emitChatCompleted($state);
+        return $state;
+    }
+
+    protected function handleFailure(Throwable $error, object $state): ChatState {
+        assert($state instanceof ChatState);
         $failure = $error instanceof ChatException
             ? $error
             : ChatException::fromThrowable($error);
@@ -109,15 +96,17 @@ final readonly class Chat
             participantName: $state->currentStep()?->participantName() ?? '?',
             inputMessages: $state->messages(),
         );
-        $newState = $this->updateState(
-            step: $failureStep,
-            state: $state,
-        );
+        $newState = $this->updateState($failureStep, $state);
         $this->emitChatTurnFailed($newState, $failure);
         return $newState;
     }
 
-    private function selectParticipant(ChatState $state): CanParticipateInChat {
+    protected function canContinue(object $state): bool {
+        assert($state instanceof ChatState);
+        return $this->continuationCriteria->canContinue($state) ?? false;
+    }
+
+    protected function selectParticipant(ChatState $state): CanParticipateInChat {
         $participant = $this->nextParticipantSelector->nextParticipant($state, $this->participants);
         $this->emitChatParticipantSelected($participant, $state);
         return $participant;
