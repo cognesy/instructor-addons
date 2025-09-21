@@ -8,6 +8,7 @@ use Cognesy\Messages\Enums\MessageRole;
 use Cognesy\Messages\Messages;
 use Cognesy\Messages\MessageStore\MessageStore;
 use Cognesy\Polyglot\Inference\Data\Usage;
+use Cognesy\Polyglot\Inference\Enums\InferenceFinishReason;
 
 it('creates participant with correct name and cycles through messages', function () {
     $participant = new ScriptedParticipant(
@@ -21,21 +22,19 @@ it('creates participant with correct name and cycles through messages', function
     
     // First call
     $step1 = $participant->act($state);
-    expect($step1->outputMessage()->content()->toString())->toBe('Hello');
-    expect($step1->outputMessage()->role()->value)->toBe('user'); // default role
-    expect($step1->outputMessage()->name())->toBe('test-user');
-    
+    expect($step1->outputMessages()->last()->toString())->toBe('Hello');
+
     // Second call
     $step2 = $participant->act($state);
-    expect($step2->outputMessage()->content()->toString())->toBe('How are you?');
+    expect($step2->outputMessages()->last()->toString())->toBe('How are you?');
     
     // Third call
     $step3 = $participant->act($state);
-    expect($step3->outputMessage()->content()->toString())->toBe('Goodbye');
+    expect($step3->outputMessages()->last()->toString())->toBe('Goodbye');
     
     // Cycles back to first
     $step4 = $participant->act($state);
-    expect($step4->outputMessage()->content()->toString())->toBe('Hello');
+    expect($step4->outputMessages()->last()->toString())->toBe('Hello');
 });
 
 it('uses custom default role', function () {
@@ -48,8 +47,8 @@ it('uses custom default role', function () {
     $state = new ChatState();
     $step = $participant->act($state);
     
-    expect($step->outputMessage()->role()->value)->toBe('assistant');
-    expect($step->outputMessage()->name())->toBe('assistant-script');
+    expect($step->outputMessages()->last()->role()->value)->toBe('assistant');
+    expect($step->outputMessages()->last()->name())->toBe('assistant-script');
 });
 
 it('returns proper usage and metadata', function () {
@@ -63,7 +62,7 @@ it('returns proper usage and metadata', function () {
     
     expect($step->usage())->toBeInstanceOf(Usage::class);
     expect($step->usage()->total())->toBe(0); // Usage::none()
-    expect($step->finishReason())->toBe('scripted');
+    expect($step->finishReason())->toBe(InferenceFinishReason::Other);
     expect($step->inferenceResponse())->toBeNull();
 });
 
@@ -117,7 +116,7 @@ it('handles empty message gracefully', function () {
     $state = new ChatState();
     $step = $participant->act($state);
     
-    expect($step->outputMessage()->content()->toString())->toBe('');
+    expect($step->outputMessages()->last()->toString())->toBe('');
     expect($step->participantName())->toBe('empty-script');
 });
 

@@ -2,19 +2,22 @@
 
 namespace Cognesy\Addons\ToolUse\Drivers\ReAct;
 
-use Cognesy\Addons\ToolUse\Contracts\CanDecideToContinueToolUse;
+use Cognesy\Addons\Core\Continuation\CanDecideToContinue;
 use Cognesy\Addons\ToolUse\Data\ToolUseState;
-use Cognesy\Addons\ToolUse\Enums\StepType;
+use Cognesy\Addons\ToolUse\Enums\ToolUseStepType;
 
-final class StopOnFinalDecision implements CanDecideToContinueToolUse
+final class StopOnFinalDecision implements CanDecideToContinue
 {
-    public function canContinue(ToolUseState $state): bool {
+    public function canContinue(object $state): bool {
+        if (!$state instanceof ToolUseState) {
+            return true;
+        }
+
         $type = $state->currentStep()?->stepType();
         return match(true) {
             $type === null => true,
-            StepType::ToolExecution->is($type) => true,
+            ToolUseStepType::ToolExecution->is($type) => true,
             default => false
         };
     }
 }
-

@@ -13,9 +13,11 @@ use Cognesy\Addons\ToolUse\ToolUse;
 use Cognesy\Addons\ToolUse\ToolUseFactory;
 use Cognesy\Events\Contracts\CanHandleEvents;
 use Cognesy\Events\EventBusResolver;
+use Cognesy\Messages\Enums\MessageRole;
 use Cognesy\Messages\Message;
 use Cognesy\Messages\Messages;
 use Cognesy\Polyglot\Inference\Data\Usage;
+use Cognesy\Polyglot\Inference\Enums\InferenceFinishReason;
 
 /**
  * LLM participant with tool-calling capabilities.
@@ -53,24 +55,34 @@ final readonly class LLMParticipantWithTools implements CanParticipateInChat
         $finalState = $this->toolUse->finalStep($toolUseState);
         $toolStep = $finalState->currentStep();
 
-        $outputMessage = new Message(
-            role: 'assistant',
-            content: $toolStep?->response() ?? '',
-            name: $this->name,
-        );
+        $stepMessages = $toolStep?->outputMessages() ?? Messages::empty();
+        $normalizedMessages = new Messages(...array_map(
+            fn(Message $message): Message => $message->role()->is(MessageRole::Assistant)
+                ? $message->withName($this->name)
+                : $message,
+            $stepMessages->all(),
+        ));
+
+        $outputMessages = $normalizedMessages->notEmpty()
+            ? $normalizedMessages
+            : new Messages(new Message(
+                role: MessageRole::Assistant->value,
+                content: '',
+                name: $this->name,
+            ));
 
         $this->emitChatToolUseCompleted($toolStep);
 
         return new ChatStep(
             participantName: $this->name,
             inputMessages: $messages,
-            outputMessage: $outputMessage,
+            outputMessages: $outputMessages,
             usage: $toolStep?->usage() ?? Usage::none(),
-            finishReason: $toolStep?->finishReason()?->value,
-            meta: [
+            finishReason: $toolStep?->finishReason() ?? InferenceFinishReason::Other,
+            metadata: [
                 'hasToolCalls' => $toolStep?->hasToolCalls() ? true : false,
                 'toolsUsed' => $toolStep?->toolCalls()->toString() ?? '',
-                'toolErrors' => count($toolStep?->errors()) ?? 0,
+                'toolErrors' => count($toolStep?->errors() ?? []),
             ],
         );
     }
@@ -80,7 +92,7 @@ final readonly class LLMParticipantWithTools implements CanParticipateInChat
         if (!$this->systemPrompt) {
             return $messages;
         }
-        return $messages->prependMessage(new Message(
+        return $messages->prependMessages(new Message(
             role: 'system',
             content: $this->systemPrompt,
         ));
@@ -100,6 +112,7 @@ final readonly class LLMParticipantWithTools implements CanParticipateInChat
         $this->events->dispatch(new ChatToolUseCompleted([
             'participant' => $this->name,
             'response' => $toolStep?->toString() ?? '',
+            'errors' => $toolStep?->errorsAsString() ?? '',
         ]));
     }
 }

@@ -2,17 +2,19 @@
 
 namespace Cognesy\Addons\Chat\Participants;
 
-use Cognesy\Addons\Chat\Compilers\AllSections;
-use Cognesy\Addons\Chat\Contracts\CanCompileMessages;
 use Cognesy\Addons\Chat\Contracts\CanParticipateInChat;
 use Cognesy\Addons\Chat\Data\ChatState;
 use Cognesy\Addons\Chat\Data\ChatStep;
 use Cognesy\Addons\Chat\Events\ChatResponseRequested;
+use Cognesy\Addons\Core\MessageCompilation\AllSections;
+use Cognesy\Addons\Core\MessageCompilation\CanCompileMessages;
 use Cognesy\Events\Contracts\CanHandleEvents;
 use Cognesy\Events\EventBusResolver;
 use Cognesy\Messages\Enums\MessageRole;
 use Cognesy\Messages\Message;
+use Cognesy\Messages\Messages;
 use Cognesy\Polyglot\Inference\Data\Usage;
+use Cognesy\Polyglot\Inference\Enums\InferenceFinishReason;
 
 final class ScriptedParticipant implements CanParticipateInChat
 {
@@ -42,35 +44,35 @@ final class ScriptedParticipant implements CanParticipateInChat
         $currentIndex = $this->index; // Store current index before incrementing
         $this->emitChatResponseRequested($state, $currentIndex);
         
-        $outputMessage = $this->next();
-        $this->emitChatResponseReceived($outputMessage, $currentIndex);
+        $outputMessages = $this->next();
+        $this->emitChatResponseReceived($outputMessages, $currentIndex);
         
         return new ChatStep(
             participantName: $this->name,
             inputMessages: $compiledMessages,
-            outputMessage: $outputMessage,
+            outputMessages: $outputMessages,
             usage: Usage::none(),
             inferenceResponse: null,
-            finishReason: 'scripted',
+            finishReason: InferenceFinishReason::Other,
         );
     }
 
-    private function next() : Message {
+    private function next() : Messages {
         if ($this->count === 0) {
-            return new Message(
+            return new Messages(new Message(
                 role: $this->defaultRole->value,
                 content: '',
                 name: $this->name,
-            );
+            ));
         }
         
         $message = $this->messages[$this->index] ?? '';
         $this->index = ($this->index + 1) % $this->count;
-        return new Message(
+        return new Messages(new Message(
             role: $this->defaultRole->value,
             content: $message,
             name: $this->name,
-        );
+        ));
     }
 
     // EVENTS ////////////////////////////////////////////////////////
@@ -84,10 +86,10 @@ final class ScriptedParticipant implements CanParticipateInChat
         ]));
     }
 
-    private function emitChatResponseReceived(Message $outputMessage, int $currentIndex) : void {
+    private function emitChatResponseReceived(Messages $outputMessages, int $currentIndex) : void {
         $this->events->dispatch(new ChatResponseRequested([
             'participant' => $this->name,
-            'response' => $outputMessage->toArray(),
+            'response' => $outputMessages->toArray(),
             'scriptIndex' => $currentIndex,
         ]));
     }

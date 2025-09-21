@@ -2,14 +2,15 @@
 
 namespace Cognesy\Addons\ToolUse\Drivers\ToolCalling;
 
+use Cognesy\Addons\ToolUse\Collections\ToolExecutions;
+use Cognesy\Addons\ToolUse\Collections\Tools;
 use Cognesy\Addons\ToolUse\Contracts\CanUseTools;
-use Cognesy\Addons\ToolUse\Data\Collections\ToolExecutions;
 use Cognesy\Addons\ToolUse\Data\ToolUseState;
 use Cognesy\Addons\ToolUse\Data\ToolUseStep;
-use Cognesy\Addons\ToolUse\Enums\StepType;
-use Cognesy\Addons\ToolUse\Formatters\ToolExecutionFormatter;
-use Cognesy\Addons\ToolUse\Tools;
+use Cognesy\Addons\ToolUse\Enums\ToolUseStepType;
+use Cognesy\Addons\ToolUse\ToolExecutor;
 use Cognesy\Http\HttpClient;
+use Cognesy\Messages\Message;
 use Cognesy\Messages\Messages;
 use Cognesy\Polyglot\Inference\Data\InferenceResponse;
 use Cognesy\Polyglot\Inference\Enums\OutputMode;
@@ -60,12 +61,17 @@ class ToolCallingDriver implements CanUseTools
      * @param ToolUseState $state The context containing messages, tools, and other related information required for tool usage.
      * @return ToolUseStep Returns an instance of ToolUseStep containing the response, executed tools, follow-up messages, and additional usage data.
      */
-    public function useTools(ToolUseState $state, Tools $tools) : ToolUseStep {
+    public function useTools(ToolUseState $state, Tools $tools, ToolExecutor $executor) : ToolUseStep {
         $pending = $this->buildPendingInference($state->messages(), $tools);
         $response = $pending->response();
-        $executions = $tools->useTools($response->toolCalls(), $state);
+        $executions = $executor->useTools($response->toolCalls(), $state);
         $messages = $this->formatter->makeExecutionMessages($executions);
-        return $this->buildStepFromResponse($response, $executions, $messages);
+        return $this->buildStepFromResponse(
+            response: $response,
+            executions: $executions,
+            followUps: $messages,
+            context: $state->messages(),
+        );
     }
 
     // INTERNAL /////////////////////////////////////////////////
@@ -94,24 +100,29 @@ class ToolCallingDriver implements CanUseTools
     private function buildStepFromResponse(
         InferenceResponse $response,
         ToolExecutions $executions,
-        Messages $followUps
+        Messages $followUps,
+        Messages $context,
     ) : ToolUseStep {
+        $outputMessages = $followUps->appendMessage(
+            Message::asAssistant($response->content()),
+        );
+
         return new ToolUseStep(
-            response: $response->content(),
+            inputMessages: $context,
+            outputMessages: $outputMessages,
+            usage: $response->usage(),
             toolCalls: $response->toolCalls(),
             toolExecutions: $executions,
-            messages: $followUps,
-            usage: $response->usage(),
             inferenceResponse: $response,
             stepType: $this->inferStepType($response, $executions)
         );
     }
 
-    private function inferStepType(InferenceResponse $response, ToolExecutions $executions) : StepType {
-        return match(true) {
-            $executions->hasErrors() => StepType::Error,
-            $response->hasToolCalls() > 0 => StepType::ToolExecution,
-            default => StepType::FinalResponse,
+    private function inferStepType(InferenceResponse $response, ToolExecutions $executions) : ToolUseStepType {
+        return match (true) {
+            $executions->hasErrors() => ToolUseStepType::Error,
+            $response->hasToolCalls() => ToolUseStepType::ToolExecution,
+            default => ToolUseStepType::FinalResponse,
         };
     }
 }

@@ -1,14 +1,14 @@
 <?php declare(strict_types=1);
 
+use Cognesy\Addons\ToolUse\Collections\Tools;
 use Cognesy\Addons\ToolUse\Data\ToolUseState;
 use Cognesy\Addons\ToolUse\Drivers\ToolCalling\ToolCallingDriver;
-use Cognesy\Addons\ToolUse\Tools;
 use Cognesy\Addons\ToolUse\Tools\FunctionTool;
 use Cognesy\Addons\ToolUse\ToolUseFactory;
 use Cognesy\Messages\Messages;
+use Cognesy\Polyglot\Inference\Collections\ToolCalls;
 use Cognesy\Polyglot\Inference\Data\InferenceResponse;
 use Cognesy\Polyglot\Inference\Data\ToolCall;
-use Cognesy\Polyglot\Inference\Data\ToolCalls;
 use Cognesy\Polyglot\Inference\Data\Usage;
 use Cognesy\Polyglot\Inference\LLMProvider;
 use Tests\Addons\Support\FakeInferenceDriver;
@@ -21,17 +21,18 @@ function _dbl(int $x): int { return $x * 2; }
 it('executes multiple tool calls and preserves follow-up order and usage', function () {
     $resp = new InferenceResponse(
         content: '',
-        toolCalls: new ToolCalls([
+        toolCalls: new ToolCalls(
             new ToolCall('_inc', ['x' => 1]),
             new ToolCall('_dbl', ['x' => 2])
-        ]),
+        ),
         usage: new Usage(3,4)
     );
     $driver = new FakeInferenceDriver([$resp]);
 
-    $tools = (new Tools())
-        ->withTool(FunctionTool::fromCallable(_inc(...)))
-        ->withTool(FunctionTool::fromCallable(_dbl(...)));
+    $tools = new Tools(
+        FunctionTool::fromCallable(_inc(...)),
+        FunctionTool::fromCallable(_dbl(...)),
+    );
         
     $state = (new ToolUseState())
         ->withMessages(Messages::fromString('run multiple'));
@@ -45,10 +46,10 @@ it('executes multiple tool calls and preserves follow-up order and usage', funct
     $step = $state->currentStep();
 
     // two executions
-    expect(count($step->toolExecutions()->all()))->toBe(2);
+    expect(count($step?->toolExecutions()->all()))->toBe(2);
     // usage passthrough
-    expect($step->usage()->toArray())->toMatchArray(['input' => 3, 'output' => 4]);
-    expect($step->inferenceResponse())->not()->toBeNull();
+    expect($step?->usage()->toArray())->toMatchArray(['input' => 3, 'output' => 4]);
+    expect($step?->inferenceResponse())->not()->toBeNull();
 
     // follow-up messages order: initial, invocation1, result1, invocation2, result2
     $msgs = $state->messages()->toArray();

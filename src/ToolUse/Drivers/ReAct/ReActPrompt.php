@@ -2,14 +2,14 @@
 
 namespace Cognesy\Addons\ToolUse\Drivers\ReAct;
 
-use Cognesy\Addons\ToolUse\Tools;
+use Cognesy\Addons\ToolUse\Collections\Tools;
 use Cognesy\Utils\Json\Json;
 
 final class ReActPrompt
 {
     public static function buildSystemPrompt(Tools $tools) : string {
         $toolSchemas = $tools->toToolSchema();
-        $toolList = $tools->descriptionList();
+        $toolList = $tools->descriptions();
         $catalog = [
             'tools' => $toolList,
             'schemas' => array_map(
@@ -25,6 +25,7 @@ final class ReActPrompt
             'You are a ReAct-style agent using Thought/Action/Observation steps.',
             'At each step, output strictly valid JSON that matches the provided schema.',
             'If you choose to act, set type=call_tool and provide tool + args.',
+            'When acting, args must be a JSON object whose keys match the selected tool parameters.',
             'If you can finish, set type=final_answer and provide answer.',
             'Keep the thought concise and actionable.',
             'Use only the available tools and their parameter schemas.',
@@ -42,4 +43,3 @@ final class ReActPrompt
         ]);
     }
 }
-

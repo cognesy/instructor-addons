@@ -4,17 +4,18 @@ use Cognesy\Addons\Chat\Data\ChatState;
 use Cognesy\Addons\Chat\Events\ChatToolUseCompleted;
 use Cognesy\Addons\Chat\Events\ChatToolUseStarted;
 use Cognesy\Addons\Chat\Participants\LLMParticipantWithTools;
+use Cognesy\Addons\ToolUse\Collections\Tools;
 use Cognesy\Addons\ToolUse\Drivers\ToolCalling\ToolCallingDriver;
-use Cognesy\Addons\ToolUse\Tools;
 use Cognesy\Addons\ToolUse\Tools\FunctionTool;
 use Cognesy\Addons\ToolUse\ToolUseFactory;
 use Cognesy\Events\EventBusResolver;
 use Cognesy\Messages\Messages;
 use Cognesy\Messages\MessageStore\MessageStore;
+use Cognesy\Polyglot\Inference\Collections\ToolCalls;
 use Cognesy\Polyglot\Inference\Data\InferenceResponse;
 use Cognesy\Polyglot\Inference\Data\ToolCall;
-use Cognesy\Polyglot\Inference\Data\ToolCalls;
 use Cognesy\Polyglot\Inference\Data\Usage;
+use Cognesy\Polyglot\Inference\Enums\InferenceFinishReason;
 use Cognesy\Polyglot\Inference\LLMProvider;
 use Tests\Addons\Support\FakeInferenceDriver;
 
@@ -43,23 +44,19 @@ it('executes tool calls and returns chat step with tool results', function () {
     $driver = new FakeInferenceDriver([
         new InferenceResponse(
             content: '',
-            toolCalls: new ToolCalls([
-                new ToolCall('test_add', ['a' => 5, 'b' => 3])
-            ]),
+            toolCalls: new ToolCalls(new ToolCall('test_add', ['a' => 5, 'b' => 3])),
             usage: new Usage(10, 20),
             finishReason: 'tool_calls'
         ),
         new InferenceResponse(
             content: 'The result is 8.',
-            toolCalls: new ToolCalls([]),
+            toolCalls: new ToolCalls(),
             usage: new Usage(5, 15),
             finishReason: 'stop'
         )
     ]);
 
-    $tools = (new Tools())->withTool(
-        FunctionTool::fromCallable(test_add(...))
-    );
+    $tools = new Tools(FunctionTool::fromCallable(test_add(...)));
 
     $toolUse = ToolUseFactory::default(
         tools: $tools,
@@ -81,38 +78,36 @@ it('executes tool calls and returns chat step with tool results', function () {
     $step = $participant->act($state);
 
     expect($step->participantName())->toBe('math-assistant');
-    expect($step->outputMessage()->content()->toString())->toBe('The result is 8.');
-    expect($step->outputMessage()->role()->value)->toBe('assistant');
-    expect($step->outputMessage()->name())->toBe('math-assistant');
+    expect($step->outputMessages()->last()->toString())->toBe('The result is 8.');
     expect($step->usage()->total())->toBe(20); // final step usage only
-    expect($step->finishReason())->toBe('stop');
-    expect($step->meta()['hasToolCalls'])->toBeFalse(); // final step doesn't have tool calls
-    expect($step->meta()['toolsUsed'])->toBe(''); // final step doesn't have tool calls
-    expect($step->meta()['toolErrors'])->toBe(0);
+    expect($step->finishReason())->toBe(InferenceFinishReason::Stop);
+    expect($step->metadata()->toArray()['hasToolCalls'])->toBeFalse(); // final step doesn't have tool calls
+    expect($step->metadata()->toArray()['toolsUsed'])->toBe(''); // final step doesn't have tool calls
+    expect($step->metadata()->toArray()['toolErrors'])->toBe(0);
 });
 
 it('handles multiple tool calls in sequence', function () {
     $driver = new FakeInferenceDriver([
         new InferenceResponse(
             content: '',
-            toolCalls: new ToolCalls([
+            toolCalls: new ToolCalls(
                 new ToolCall('test_add', ['a' => 5, 'b' => 3]),
                 new ToolCall('test_multiply', ['a' => 2, 'b' => 4])
-            ]),
+            ),
             usage: new Usage(15, 25),
             finishReason: 'tool_calls'
         ),
         new InferenceResponse(
             content: 'First result is 8, second result is 8.',
-            toolCalls: new ToolCalls([]),
+            toolCalls: new ToolCalls(),
             usage: new Usage(10, 20),
             finishReason: 'stop'
         )
     ]);
 
-    $tools = (new Tools())->withTools(
+    $tools = new Tools(
         FunctionTool::fromCallable(test_add(...)),
-        FunctionTool::fromCallable(test_multiply(...))
+        FunctionTool::fromCallable(test_multiply(...)),
     );
 
     $toolUse = ToolUseFactory::default(
@@ -135,18 +130,18 @@ it('handles multiple tool calls in sequence', function () {
     $step = $participant->act($state);
 
     expect($step->participantName())->toBe('multi-tool-assistant');
-    expect($step->outputMessage()->content()->toString())->toBe('First result is 8, second result is 8.');
+    expect($step->outputMessages()->last()->toString())->toBe('First result is 8, second result is 8.');
     expect($step->usage()->total())->toBe(30); // final step usage only
-    expect($step->meta()['toolsUsed'])->toBe(''); // final step doesn't have tool calls
+    expect($step->metadata()->toArray()['toolsUsed'])->toBe(''); // final step doesn't have tool calls
 });
 
 it('prepends system prompt when provided', function () {
     $driver = new FakeInferenceDriver([
         new InferenceResponse(
             content: 'Hello! I am a helpful math assistant.',
-            toolCalls: new ToolCalls([]),
+            finishReason: 'stop',
+            toolCalls: new ToolCalls(),
             usage: new Usage(5, 10),
-            finishReason: 'stop'
         )
     ]);
 
@@ -179,7 +174,7 @@ it('works without system prompt', function () {
     $driver = new FakeInferenceDriver([
         new InferenceResponse(
             content: 'Hello!',
-            toolCalls: new ToolCalls([]),
+            toolCalls: new ToolCalls(),
             usage: new Usage(3, 7),
             finishReason: 'stop'
         )
@@ -224,7 +219,7 @@ it('dispatches tool use events', function () {
     $driver = new FakeInferenceDriver([
         new InferenceResponse(
             content: 'Result is ready.',
-            toolCalls: new ToolCalls([]),
+            toolCalls: new ToolCalls(),
             usage: new Usage(8, 12),
             finishReason: 'stop'
         )

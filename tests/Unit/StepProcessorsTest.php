@@ -1,11 +1,10 @@
 <?php declare(strict_types=1);
 
+use Cognesy\Addons\Core\Processors\AccumulateTokenUsage;
+use Cognesy\Addons\Core\Processors\AppendContextMetadata;
+use Cognesy\Addons\Core\Processors\AppendStepMessages;
 use Cognesy\Addons\ToolUse\Data\ToolUseState;
 use Cognesy\Addons\ToolUse\Data\ToolUseStep;
-use Cognesy\Addons\ToolUse\Processors\AccumulateTokenUsage;
-use Cognesy\Addons\ToolUse\Processors\AppendContextMetadata;
-use Cognesy\Addons\ToolUse\Processors\AppendToolStateMessages;
-use Cognesy\Addons\ToolUse\Processors\UpdateToolState;
 use Cognesy\Messages\Message;
 use Cognesy\Messages\Messages;
 use Cognesy\Polyglot\Inference\Data\Usage;
@@ -24,7 +23,7 @@ it('accumulates usage from step into state', function () {
 
 it('appends context variables message when variables present', function () {
     $state = new ToolUseState();
-    $state = $state->withVariable('a', 1);
+    $state = $state->withMetadata('a', 1);
     $before = $state->messages()->count();
 
     $step = new ToolUseStep();
@@ -47,9 +46,9 @@ it('does not append context variables when none present', function () {
 it('appends step messages to state', function () {
     $state = new ToolUseState();
     $msgs = Messages::fromMessages([ new Message(role: 'user', content: 'x') ]);
-    $step = new ToolUseStep(messages: $msgs);
+    $step = new ToolUseStep(outputMessages: $msgs);
     $state = $state->withCurrentStep($step)->withAddedStep($step);
 
-    $state = (new AppendToolStateMessages())->process($state);
+    $state = (new AppendStepMessages())->process($state);
     expect($state->messages()->count())->toBe(1);
 });
