@@ -9,7 +9,7 @@ use Cognesy\Addons\Chat\Data\ChatState;
 use Cognesy\Addons\Chat\Data\ChatStep;
 use Cognesy\Addons\Chat\Events\ChatResponseRequested;
 use Cognesy\Addons\StepByStep\MessageCompilation\CanCompileMessages;
-use Cognesy\Addons\StepByStep\MessageCompilation\Compilers\AllSections;
+use Cognesy\Addons\StepByStep\MessageCompilation\Compilers\SelectedSections;
 use Cognesy\Events\Contracts\CanHandleEvents;
 use Cognesy\Events\EventBusResolver;
 use Cognesy\Messages\Contracts\CanProvideMessage;
@@ -31,7 +31,7 @@ final class ExternalParticipant implements CanParticipateInChat
         ?CanHandleEvents $events = null,
     ) {
         $this->provider = $this->makeProvider($provider);
-        $this->compiler = $compiler ?? new AllSections();
+        $this->compiler = $compiler ?? new SelectedSections(['summary', 'buffer', 'messages']);
         $this->events = $events ?? EventBusResolver::using($events);
     }
 
@@ -51,6 +51,8 @@ final class ExternalParticipant implements CanParticipateInChat
             finishReason: InferenceFinishReason::Other,
         );
     }
+
+    // INTERNAL //////////////////////////////////////////////////////////
 
     private function makeProvider(callable|CanProvideMessage|null $provider) : CanRespondWithMessages {
         return match(true) {
