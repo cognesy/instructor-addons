@@ -6,16 +6,22 @@ namespace Cognesy\Addons\StepByStep\Continuation;
  * Shared base for domain continuation collections.
  *
  * @template TState of object
+ * @implements CanDecideToContinue<TState>
  */
 readonly class ContinuationCriteria implements CanDecideToContinue
 {
-    /** @var list<CanDecideToContinue> */
+    /** @var list<CanDecideToContinue<TState>> */
     private array $criteria;
     /** @var ContinuationEvaluator<TState> */
     private ContinuationEvaluator $evaluator;
 
+    /**
+     * @param CanDecideToContinue<TState> ...$criteria
+     */
     public function __construct(CanDecideToContinue ...$criteria) {
+        /** @var list<CanDecideToContinue<TState>> $criteria */
         $this->criteria = $criteria;
+        /** @psalm-suppress InvalidPropertyAssignmentValue - Template parameter preserved through wrapAll */
         $this->evaluator = ContinuationEvaluator::from($this->wrapAll($criteria));
     }
 
@@ -26,10 +32,14 @@ readonly class ContinuationCriteria implements CanDecideToContinue
     /**
      * @param TState $state
      */
+    #[\Override]
     final public function canContinue(object $state): bool {
         return $this->evaluator->canContinue($state);
     }
 
+    /**
+     * @param CanDecideToContinue<TState> ...$criteria
+     */
     final public function withCriteria(CanDecideToContinue ...$criteria): static {
         if ($criteria === []) {
             return $this;
@@ -39,7 +49,7 @@ readonly class ContinuationCriteria implements CanDecideToContinue
     }
 
     /**
-     * @param list<CanDecideToContinue> $criteria
+     * @param list<CanDecideToContinue<TState>> $criteria
      * @return list<callable(TState): bool>
      */
     private function wrapAll(array $criteria): array {
@@ -51,14 +61,21 @@ readonly class ContinuationCriteria implements CanDecideToContinue
         return $wrapped;
     }
 
+    /**
+     * @param CanDecideToContinue<TState> ...$criteria
+     */
     protected function newInstance(CanDecideToContinue ...$criteria): static {
         return new static(...$criteria);
     }
 
     /**
+     * @param CanDecideToContinue<TState> $criterion
      * @return callable(TState): bool
      */
     protected function wrapCriterion(CanDecideToContinue $criterion): callable {
-        return static fn(object $state): bool => $criterion->canContinue($state);
+        return static function(object $state) use ($criterion): bool {
+            /** @var TState $state */
+            return $criterion->canContinue($state);
+        };
     }
 }

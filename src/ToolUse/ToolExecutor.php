@@ -114,9 +114,11 @@ final readonly class ToolExecutor
 
     private function prepareTool(string $name, ToolUseState $state): ToolInterface {
         $tool = $this->tools->get($name);
-        return $tool instanceof CanAccessAnyState
-            ? $tool->withState($state)
-            : $tool;
+        if ($tool instanceof CanAccessAnyState) {
+            // Since CanAccessAnyState extends ToolInterface, withState preserves ToolInterface
+            return $tool->withState($state);
+        }
+        return $tool;
     }
 
     private function validateArgs(ToolInterface $tool, array $args): Result {
@@ -168,10 +170,21 @@ final readonly class ToolExecutor
     }
 
     private function emitToolCallCompleted(ToolExecution $toolExecution): void {
+        $error = null;
+        if ($toolExecution->result()->isFailure()) {
+            $errorValue = $toolExecution->result()->error();
+            $error = match(true) {
+                is_string($errorValue) => $errorValue,
+                $errorValue instanceof \Throwable => $errorValue->getMessage(),
+                is_object($errorValue) && method_exists($errorValue, '__toString') => (string) $errorValue,
+                default => is_scalar($errorValue) ? (string) $errorValue : null,
+            };
+        }
+
         $this->events->dispatch(new ToolCallCompleted([
             'tool' => $toolExecution->toolCall()->name(),
             'success' => $toolExecution->result()->isSuccess(),
-            'error' => $toolExecution->result()->isFailure() ? (string)$toolExecution->result()->error() : null,
+            'error' => $error,
             'startedAt' => $toolExecution->startedAt()->format(DATE_ATOM),
             'endedAt' => $toolExecution->endedAt()->format(DATE_ATOM),
         ]));

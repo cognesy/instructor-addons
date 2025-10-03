@@ -44,6 +44,9 @@ class ToolUse extends StepByStep
     private readonly CanUseTools $driver;
     private readonly ContinuationCriteria $continuationCriteria;
 
+    /**
+     * @param CanApplyProcessors<ToolUseState> $processors
+     */
     public function __construct(
         Tools $tools,
         CanApplyProcessors $processors,
@@ -52,7 +55,8 @@ class ToolUse extends StepByStep
         ?CanHandleEvents $events,
     ) {
         parent::__construct($processors);
-        
+
+        /** @var CanApplyProcessors<ToolUseState> $processors */
         $this->processors = $processors;
         $this->continuationCriteria = $continuationCriteria;
         $this->driver = $driver;
@@ -63,11 +67,13 @@ class ToolUse extends StepByStep
 
     // INTERNAL /////////////////////////////////////////////
 
+    #[\Override]
     protected function canContinue(object $state): bool {
         assert($state instanceof ToolUseState);
         return $this->continuationCriteria->canContinue($state);
     }
 
+    #[\Override]
     protected function makeNextStep(object $state): ToolUseStep {
         assert($state instanceof ToolUseState);
         $this->emitToolUseStepStarted($state);
@@ -78,6 +84,7 @@ class ToolUse extends StepByStep
         );
     }
 
+    #[\Override]
     protected function applyStep(object $state, object $nextStep): ToolUseState {
         assert($state instanceof ToolUseState);
         assert($nextStep instanceof ToolUseStep);
@@ -88,18 +95,21 @@ class ToolUse extends StepByStep
         return $newState;
     }
 
+    #[\Override]
     protected function onNoNextStep(object $state): ToolUseState {
         assert($state instanceof ToolUseState);
         $this->emitToolUseFinished($state);
         return $state;
     }
 
+    #[\Override]
     protected function onStepCompleted(object $state): ToolUseState {
         assert($state instanceof ToolUseState);
         $this->emitToolUseStepCompleted($state);
         return $state;
     }
 
+    #[\Override]
     protected function onFailure(Throwable $error, object $state): ToolUseState {
         assert($state instanceof ToolUseState);
         $failure = $error instanceof ToolUseException
@@ -133,6 +143,9 @@ class ToolUse extends StepByStep
 
     // MUTATORS /////////////////////////////////////////////
 
+    /**
+     * @param CanApplyProcessors<ToolUseState>|null $processors
+     */
     public function with(
         ?Tools $tools = null,
         ?CanApplyProcessors $processors = null,
@@ -149,8 +162,13 @@ class ToolUse extends StepByStep
         );
     }
 
+    /**
+     * @param CanProcessAnyState<ToolUseState> ...$processors
+     */
     public function withProcessors(CanProcessAnyState ...$processors): self {
-        return $this->with(processors: new StateProcessors(...$processors));
+        /** @var CanApplyProcessors<ToolUseState> $stateProcessors */
+        $stateProcessors = new StateProcessors(...$processors);
+        return $this->with(processors: $stateProcessors);
     }
 
     public function withDriver(CanUseTools $driver) : self {

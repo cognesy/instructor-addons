@@ -25,10 +25,22 @@ class Image extends ImageUtil
     }
 
     /**
+     * Create an Image instance from a file path.
+     *
+     * @param string $imagePath The path to the image file.
+     * @return static
+     */
+    #[\Override]
+    public static function fromFile(string $imagePath): static {
+        return parent::fromFile($imagePath);
+    }
+
+    /**
      * Get OpenAI API compatible array representation of the image.
      *
      * @return array
      */
+    #[\Override]
     public function toArray(): array {
         $content = [];
         if (!empty($this->prompt)) {

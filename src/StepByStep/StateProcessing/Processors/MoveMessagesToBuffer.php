@@ -10,6 +10,9 @@ use Cognesy\Events\Contracts\CanHandleEvents;
 use Cognesy\Events\EventBusResolver;
 use Cognesy\Utils\Tokenizer;
 
+/**
+ * @implements CanProcessAnyState<object>
+ */
 final readonly class MoveMessagesToBuffer implements CanProcessAnyState
 {
     private CanHandleEvents $events;
@@ -22,13 +25,17 @@ final readonly class MoveMessagesToBuffer implements CanProcessAnyState
         $this->events = $events ?? EventBusResolver::using($events);
     }
 
+    #[\Override]
     public function canProcess(object $state): bool {
         return $state instanceof ChatState
             && $this->shouldProcess($state->messages()->toString());
     }
 
+    #[\Override]
     public function process(object $state, ?callable $next = null): object {
         $newState = $next ? $next($state) : $state;
+
+        assert($newState instanceof ChatState);
 
         [$keep, $overflow] = (new SplitMessages)->split(
             messages: $newState->messages(),
@@ -39,8 +46,6 @@ final readonly class MoveMessagesToBuffer implements CanProcessAnyState
             'overflow' => $overflow->toArray(),
             'keep' => $keep->toArray(),
         ]));
-
-        assert($newState instanceof ChatState);
 
         $newMessageStore = $newState->store()
             ->section($this->bufferSection)

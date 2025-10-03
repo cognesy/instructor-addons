@@ -23,6 +23,9 @@ use Cognesy\Polyglot\Inference\Enums\InferenceFinishReason;
 use Cognesy\Utils\Metadata;
 use Throwable;
 
+/**
+ * @implements HasStepErrors<Throwable>
+ */
 final readonly class ChatStep implements
     HasStepChatCompletion,
     HasStepErrors,
@@ -58,7 +61,7 @@ final readonly class ChatStep implements
         $this->usage = $usage ?? new Usage();
         $this->inferenceResponse = $inferenceResponse;
         $this->finishReason = $finishReason;
-        $this->metadata = Metadata::fromArray($metadata ?? []);
+        $this->metadata = $metadata instanceof Metadata ? $metadata : Metadata::fromArray($metadata ?? []);
         $this->errors = $this->normalizeErrors($errors);
     }
 
@@ -69,9 +72,9 @@ final readonly class ChatStep implements
             'participantName' => $this->participantName,
             'inputMessages' => $this->inputMessages?->toArray(),
             'outputMessages' => $this->outputMessages?->toArray(),
-            'usage' => $this->usage?->toArray(),
+            'usage' => $this->usage->toArray(),
             'inferenceResponse' => $this->inferenceResponse?->toArray(),
-            'finishReason' => $this->finishReason->value ?? null,
+            'finishReason' => $this->finishReason?->value,
             'meta' => $this->metadata,
             'errors' => array_map(
                 fn(Throwable $error): array => [

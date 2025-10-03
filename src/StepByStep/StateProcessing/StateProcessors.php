@@ -6,14 +6,18 @@ use Closure;
 
 /**
  * Generic middleware chain for processing state objects.
- * 
+ *
  * @template TState of object
+ * @implements CanApplyProcessors<TState>
  */
 final readonly class StateProcessors implements CanApplyProcessors
 {
-    /** @var CanProcessAnyState[] */
+    /** @var CanProcessAnyState<TState>[] */
     protected array $processors;
 
+    /**
+     * @param CanProcessAnyState<TState> ...$processors
+     */
     public function __construct(CanProcessAnyState ...$processors) {
         $this->processors = $processors;
     }
@@ -24,6 +28,9 @@ final readonly class StateProcessors implements CanApplyProcessors
         return new static();
     }
 
+    /**
+     * @param CanProcessAnyState<TState> ...$processors
+     */
     public function withProcessors(CanProcessAnyState ...$processors): static {
         return new static(...$processors);
     }
@@ -34,8 +41,10 @@ final readonly class StateProcessors implements CanApplyProcessors
      * Apply all processors to the state using middleware chain pattern.
      *
      * @param TState $state
+     * @param (callable(TState): TState)|null $terminalFn
      * @return TState
      */
+    #[\Override]
     public function apply(object $state, ?callable $terminalFn = null): object {
         $middlewareChain = $this->buildMiddlewareChain($terminalFn);
         return ($middlewareChain)($state);
@@ -43,11 +52,21 @@ final readonly class StateProcessors implements CanApplyProcessors
 
     // INTERNALS ////////////////////////////////////////////
 
+    /**
+     * @param (callable(TState): TState)|null $terminalFn
+     * @return Closure(TState): TState
+     */
     private function buildMiddlewareChain(?callable $terminalFn = null): Closure {
-        $next = match(true) {
-            ($terminalFn !== null) => $terminalFn,
-            default => fn(object $state): object => $state,
+        /**
+         * @param TState $state
+         * @return TState
+         */
+        $identity = function(object $state): object {
+            return $state;
         };
+
+        /** @var callable(TState): TState $next */
+        $next = $terminalFn ?? $identity;
 
         foreach ($this->reversed() as $processor) {
             $currentNext = $next;
@@ -55,9 +74,14 @@ final readonly class StateProcessors implements CanApplyProcessors
                 if (!$processor->canProcess($state)) {
                     return $currentNext($state);
                 }
+                /**
+                 * @var TState $state
+                 * @psalm-suppress InvalidArgument - Processors work via canProcess() runtime check
+                 */
                 return $processor->process($state, $currentNext);
             };
         }
+        /** @var Closure(TState): TState $next */
         return $next;
     }
 

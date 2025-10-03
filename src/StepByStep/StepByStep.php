@@ -15,12 +15,17 @@ use Throwable;
  */
 abstract class StepByStep implements CanExecuteIteratively
 {
+    /** @var CanApplyProcessors<TState>|null */
     protected ?CanApplyProcessors $processors;
 
+    /**
+     * @param CanApplyProcessors<TState>|null $processors
+     */
     public function __construct(?CanApplyProcessors $processors = null) {
         $this->processors = $processors;
     }
 
+    #[\Override]
     public function nextStep(object $state): object {
         return match(true) {
             !$this->hasNextStep($state) => $this->onNoNextStep($state),
@@ -32,6 +37,7 @@ abstract class StepByStep implements CanExecuteIteratively
     /**
      * @param TState $state
      */
+    #[\Override]
     public function hasNextStep(object $state): bool {
         return $this->canContinue($state);
     }
@@ -40,6 +46,7 @@ abstract class StepByStep implements CanExecuteIteratively
      * @param TState $state
      * @return TState
      */
+    #[\Override]
     public function finalStep(object $state): object {
         while ($this->hasNextStep($state)) {
             $state = $this->nextStep($state);
@@ -49,8 +56,9 @@ abstract class StepByStep implements CanExecuteIteratively
 
     /**
      * @param TState $state
-     * @return iterable<TState>
+     * @return \Generator<mixed, TState, mixed, mixed>
      */
+    #[\Override]
     public function iterator(object $state): iterable {
         while ($this->hasNextStep($state)) {
             $state = $this->nextStep($state);
@@ -86,9 +94,16 @@ abstract class StepByStep implements CanExecuteIteratively
      */
     protected function performThroughProcessors(object $state): object {
         try {
+            assert($this->processors !== null);
+            /**
+             * @psalm-suppress InvalidArgument - Terminal function signature is correct at runtime
+             */
             return $this->processors->apply(
                 $state,
-                fn(object $state) => $this->performStep($state)
+                function(object $state): object {
+                    /** @var TState $state */
+                    return $this->performStep($state);
+                }
             );
         } catch (Throwable $error) {
             return $this->onFailure($error, $state);

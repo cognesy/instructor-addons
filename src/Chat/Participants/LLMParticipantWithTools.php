@@ -42,10 +42,12 @@ final readonly class LLMParticipantWithTools implements CanParticipateInChat
         $this->toolUse = $toolUse ?? ToolUseFactory::default(events: $this->events);
     }
 
+    #[\Override]
     public function name(): string {
         return $this->name;
     }
 
+    #[\Override]
     public function act(ChatState $state): ChatStep {
         $messages = $this->prepareMessages($state);
         $toolUseState = (new ToolUseState)->withMessages($messages);
@@ -81,7 +83,7 @@ final readonly class LLMParticipantWithTools implements CanParticipateInChat
             finishReason: $toolStep?->finishReason() ?? InferenceFinishReason::Other,
             metadata: [
                 'hasToolCalls' => $toolStep?->hasToolCalls() ? true : false,
-                'toolsUsed' => $toolStep?->toolCalls()->toString() ?? '',
+                'toolsUsed' => $toolStep?->toolCalls()->toString(),
                 'toolErrors' => count($toolStep?->errors() ?? []),
             ],
         );

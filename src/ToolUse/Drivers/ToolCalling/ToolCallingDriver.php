@@ -61,6 +61,7 @@ class ToolCallingDriver implements CanUseTools
      * @param ToolUseState $state The context containing messages, tools, and other related information required for tool usage.
      * @return ToolUseStep Returns an instance of ToolUseStep containing the response, executed tools, follow-up messages, and additional usage data.
      */
+    #[\Override]
     public function useTools(ToolUseState $state, Tools $tools, ToolExecutor $executor) : ToolUseStep {
         $pending = $this->buildPendingInference($state->messages(), $tools);
         $response = $pending->response();
@@ -81,12 +82,17 @@ class ToolCallingDriver implements CanUseTools
         Messages $messages,
         Tools $tools
     ) : PendingInference {
+        $toolChoice = is_array($this->toolChoice)
+            ? ($this->toolChoice['type'] ?? 'auto')
+            : $this->toolChoice;
+        assert(is_string($toolChoice));
+
         $inference = (new Inference)
             ->withLLMProvider($this->llm)
             ->withMessages($messages->toArray())
             ->withModel($this->model)
             ->withTools($tools->toToolSchema())
-            ->withToolChoice($this->toolChoice)
+            ->withToolChoice($toolChoice)
             ->withResponseFormat($this->responseFormat)
             ->withOptions(array_merge($this->options, ['parallel_tool_calls' => $this->parallelToolCalls]))
             ->withOutputMode($this->mode);

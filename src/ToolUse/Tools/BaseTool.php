@@ -7,14 +7,11 @@ use Cognesy\Dynamic\StructureFactory;
 use Cognesy\Utils\Result\Result;
 use Throwable;
 
-/**
- * @method mixed __invoke(mixed ...$args)
- */
 abstract class BaseTool implements ToolInterface
 {
     protected string $name;
     protected string $description;
-    protected array $cachedParamsJsonSchema; // cached
+    protected array $cachedParamsJsonSchema;
 
     public function __construct(
         ?string $name = null,
@@ -22,18 +19,25 @@ abstract class BaseTool implements ToolInterface
     ) {
         $this->name = $name ?? static::class;
         $this->description = $description ?? '';
+        $this->cachedParamsJsonSchema = [];
     }
 
-    // Intentionally rely on subclass __invoke signature.
+    /**
+     * Subclasses must implement __invoke with their specific signature
+     */
+    abstract public function __invoke(mixed ...$args): mixed;
 
+    #[\Override]
     public function name(): string {
         return $this->name;
     }
 
+    #[\Override]
     public function description(): string {
         return $this->description;
     }
 
+    #[\Override]
     public function use(mixed ...$args): Result {
         try {
             $value = $this->__invoke(...$args);
@@ -43,6 +47,7 @@ abstract class BaseTool implements ToolInterface
         return Result::success($value);
     }
 
+    #[\Override]
     public function toToolSchema(): array {
         return [
             'type' => 'function',
