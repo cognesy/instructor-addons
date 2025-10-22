@@ -1,15 +1,16 @@
 <?php declare(strict_types=1);
 
-namespace Cognesy\Addons\ToolUse\Drivers\ReAct;
+namespace Cognesy\Addons\ToolUse\Drivers\ReAct\Utils;
 
 use Cognesy\Addons\ToolUse\Data\ToolExecution;
+use Cognesy\Addons\ToolUse\Drivers\ReAct\Contracts\Decision;
 use Cognesy\Messages\Message;
 use Cognesy\Messages\Messages;
 use Cognesy\Utils\Json\Json;
 
 final class ReActFormatter
 {
-    public function assistantThoughtActionMessage(ReActDecision $decision) : Message {
+    public function assistantThoughtActionMessage(Decision $decision) : Message {
         $content = "Thought: " . $decision->thought();
         if ($decision->isCall()) {
             $content .= "\nAction: " . ($decision->tool() ?? '');

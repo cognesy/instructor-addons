@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Cognesy\Addons\ToolUse\Drivers\ReAct;
+namespace Cognesy\Addons\ToolUse\Drivers\ReAct\ContinuationCriteria;
 
 use Cognesy\Addons\StepByStep\Continuation\CanDecideToContinue;
 use Cognesy\Addons\ToolUse\Data\ToolUseState;
