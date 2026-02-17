@@ -13,17 +13,39 @@ use Cognesy\Addons\ToolUse\Enums\ToolUseStepType;
 use Cognesy\Addons\ToolUse\Tools\FunctionTool;
 use Cognesy\Addons\ToolUse\ToolUse;
 use Cognesy\Addons\ToolUse\ToolUseFactory;
+use Cognesy\Events\EventBusResolver;
+use Cognesy\Instructor\Creation\StructuredOutputConfigBuilder;
+use Cognesy\Instructor\StructuredOutputRuntime;
 use Cognesy\Messages\Messages;
 use Cognesy\Polyglot\Inference\Data\InferenceResponse;
+use Cognesy\Polyglot\Inference\InferenceRuntime;
 use Cognesy\Polyglot\Inference\LLMProvider;
 use Cognesy\Utils\Time\FrozenClock;
-use Tests\Addons\Support\FakeInferenceDriver;
+use Tests\Addons\Support\FakeInferenceRequestDriver;
 
 
 function _noop(): string { return 'ok'; }
 
+function makeReActDriverForEdgeCases(FakeInferenceRequestDriver $driver): ReActDriver {
+    $events = EventBusResolver::using(null);
+    $inference = InferenceRuntime::fromProvider(
+        provider: LLMProvider::new()->withDriver($driver),
+        events: $events,
+    );
+    $structuredOutput = new StructuredOutputRuntime(
+        inference: $inference,
+        events: $events,
+        config: (new StructuredOutputConfigBuilder())->create(),
+    );
+
+    return new ReActDriver(
+        inference: $inference,
+        structuredOutput: $structuredOutput,
+    );
+}
+
 it('sets react_last_decision_type for call_tool and final_answer', function () {
-    $driver = new FakeInferenceDriver([
+    $driver = new FakeInferenceRequestDriver([
         new InferenceResponse(content: json_encode([
             'thought' => 'x', 'type' => 'call_tool', 'tool' => '_noop', 'args' => []
         ])),
@@ -32,7 +54,7 @@ it('sets react_last_decision_type for call_tool and final_answer', function () {
         ])),
     ]);
 
-    $react = new ReActDriver(llm: LLMProvider::new()->withDriver($driver));
+    $react = makeReActDriverForEdgeCases($driver);
 
     $tools = new Tools(FunctionTool::fromCallable(_noop(...)));
     $state = new ToolUseState();
@@ -54,11 +76,11 @@ it('sets react_last_decision_type for call_tool and final_answer', function () {
 
 it('records extraction failures inside failure steps (deterministic)', function () {
     // malformed JSON to trigger failure inside StructuredOutput path
-    $driver = new FakeInferenceDriver([
+    $driver = new FakeInferenceRequestDriver([
         new InferenceResponse(content: '{bad json'),
     ]);
 
-    $react = new ReActDriver(llm: LLMProvider::new()->withDriver($driver));
+    $react = makeReActDriverForEdgeCases($driver);
     $tools = new Tools(FunctionTool::fromCallable(_noop(...)));
     $state = new ToolUseState();
 
@@ -83,5 +105,5 @@ it('records extraction failures inside failure steps (deterministic)', function 
     expect($result->currentStep()?->hasErrors())->toBeTrue();
     expect($result->currentStep()?->stepType())->toBe(ToolUseStepType::Error);
     expect($result->currentStep()?->errorsAsString())
-        ->toContain('Empty response content');
+        ->toContain('Decision type must be call_tool or final_answer');
 });

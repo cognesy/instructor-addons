@@ -22,9 +22,10 @@ use Cognesy\Polyglot\Inference\Collections\ToolCalls;
 use Cognesy\Polyglot\Inference\Data\InferenceResponse;
 use Cognesy\Polyglot\Inference\Data\ToolCall;
 use Cognesy\Polyglot\Inference\Enums\InferenceFinishReason;
+use Cognesy\Polyglot\Inference\InferenceRuntime;
 use Cognesy\Polyglot\Inference\LLMProvider;
 use Cognesy\Utils\Result\Result;
-use Tests\Addons\Support\FakeInferenceDriver;
+use Tests\Addons\Support\FakeInferenceRequestDriver;
 use Cognesy\Addons\StepByStep\Continuation\ContinuationCriteria;
 use Cognesy\Addons\StepByStep\Continuation\Criteria\ErrorPresenceCheck;
 use Cognesy\Addons\StepByStep\Continuation\Criteria\StepsLimit;
@@ -36,7 +37,7 @@ use Cognesy\Addons\ToolUse\Continuation\ToolCallPresenceCheck;
 function _sum(int $a, int $b): int { return $a + $b; }
 
 it('continues loop on tool failure and formats error message', function () {
-    $driver = new FakeInferenceDriver([
+    $driver = new FakeInferenceRequestDriver([
         new InferenceResponse(
             content: '',
             toolCalls: new ToolCalls(new ToolCall('_sum', ['a' => 2])) // missing required 'b'
@@ -50,7 +51,11 @@ it('continues loop on tool failure and formats error message', function () {
 
     $toolUse = ToolUseFactory::default(
         tools: $tools,
-        driver: new ToolCallingDriver(llm: LLMProvider::new()->withDriver($driver))
+        driver: new ToolCallingDriver(
+            inference: InferenceRuntime::fromProvider(
+                provider: LLMProvider::new()->withDriver($driver),
+            ),
+        )
     );
 
     $state = $toolUse->nextStep($state);

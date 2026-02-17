@@ -13,8 +13,9 @@ use Cognesy\Polyglot\Inference\Collections\ToolCalls;
 use Cognesy\Polyglot\Inference\Data\InferenceResponse;
 use Cognesy\Polyglot\Inference\Data\ToolCall;
 use Cognesy\Polyglot\Inference\Data\Usage;
+use Cognesy\Polyglot\Inference\InferenceRuntime;
 use Cognesy\Polyglot\Inference\LLMProvider;
-use Tests\Addons\Support\FakeInferenceDriver;
+use Tests\Addons\Support\FakeInferenceRequestDriver;
 
 
 function _inc_lb(int $x): int { return $x + 1; }
@@ -39,7 +40,7 @@ it('hasNextStep stops when criteria block first step', function () {
 });
 
 it('finalStep respects StepsLimit(1)', function () {
-    $driver = new FakeInferenceDriver([
+    $driver = new FakeInferenceRequestDriver([
         new InferenceResponse(content: '', toolCalls: new ToolCalls(new ToolCall('_inc_lb', ['x' => 1]))),
     ]);
     $tools = new Tools(FunctionTool::fromCallable(_inc_lb(...)));
@@ -49,7 +50,11 @@ it('finalStep respects StepsLimit(1)', function () {
     $toolUse = ToolUseFactory::default(
         tools: $tools,
         continuationCriteria: new ContinuationCriteria(new StepsLimit(1, static fn(ToolUseState $state): int => $state->stepCount())),
-        driver: new ToolCallingDriver(llm: LLMProvider::new()->withDriver($driver))
+        driver: new ToolCallingDriver(
+            inference: InferenceRuntime::fromProvider(
+                provider: LLMProvider::new()->withDriver($driver),
+            ),
+        )
     );
 
     $state = $toolUse->finalStep($state);
@@ -57,7 +62,7 @@ it('finalStep respects StepsLimit(1)', function () {
 });
 
 it('accumulates usage across steps', function () {
-    $driver = new FakeInferenceDriver([
+    $driver = new FakeInferenceRequestDriver([
         new InferenceResponse(content: '', toolCalls: new ToolCalls(new ToolCall('_inc_lb', ['x' => 1])), usage: new Usage(2,3)),
         new InferenceResponse(content: 'ok', usage: new Usage(4,5)),
     ]);
@@ -68,7 +73,11 @@ it('accumulates usage across steps', function () {
         
     $toolUse = ToolUseFactory::default(
         tools: $tools,
-        driver: new ToolCallingDriver(llm: LLMProvider::new()->withDriver($driver))
+        driver: new ToolCallingDriver(
+            inference: InferenceRuntime::fromProvider(
+                provider: LLMProvider::new()->withDriver($driver),
+            ),
+        )
     );
 
     $state = $toolUse->nextStep($state);

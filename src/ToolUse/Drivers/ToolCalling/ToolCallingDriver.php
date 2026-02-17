@@ -9,15 +9,14 @@ use Cognesy\Addons\ToolUse\Contracts\CanUseTools;
 use Cognesy\Addons\ToolUse\Data\ToolUseState;
 use Cognesy\Addons\ToolUse\Data\ToolUseStep;
 use Cognesy\Addons\ToolUse\Enums\ToolUseStepType;
-use Cognesy\Http\HttpClient;
 use Cognesy\Messages\Message;
 use Cognesy\Messages\Messages;
 use Cognesy\Polyglot\Inference\Collections\ToolCalls;
 use Cognesy\Polyglot\Inference\Config\InferenceRetryPolicy;
+use Cognesy\Polyglot\Inference\Contracts\CanCreateInference;
+use Cognesy\Polyglot\Inference\Data\InferenceRequest;
 use Cognesy\Polyglot\Inference\Data\InferenceResponse;
 use Cognesy\Polyglot\Inference\Enums\OutputMode;
-use Cognesy\Polyglot\Inference\Inference;
-use Cognesy\Polyglot\Inference\LLMProvider;
 use Cognesy\Polyglot\Inference\PendingInference;
 
 /**
@@ -28,8 +27,6 @@ use Cognesy\Polyglot\Inference\PendingInference;
  */
 class ToolCallingDriver implements CanUseTools
 {
-    private LLMProvider $llm;
-    private ?HttpClient $httpClient = null;
     private string|array $toolChoice;
     private string $model;
     private array $responseFormat;
@@ -38,10 +35,10 @@ class ToolCallingDriver implements CanUseTools
     private ?InferenceRetryPolicy $retryPolicy;
     private bool $parallelToolCalls = false;
     private ToolExecutionFormatter $formatter;
+    private CanCreateInference $inference;
 
     public function __construct(
-        ?LLMProvider $llm = null,
-        ?HttpClient  $httpClient = null,
+        CanCreateInference $inference,
         string|array $toolChoice = 'auto',
         array        $responseFormat = [],
         string       $model = '',
@@ -49,8 +46,7 @@ class ToolCallingDriver implements CanUseTools
         OutputMode   $mode = OutputMode::Tools,
         ?InferenceRetryPolicy $retryPolicy = null,
     ) {
-        $this->llm = $llm ?? LLMProvider::new();
-        $this->httpClient = $httpClient;
+        $this->inference = $inference;
         $this->toolChoice = $toolChoice;
         $this->model = $model;
         $this->responseFormat = $responseFormat;
@@ -100,22 +96,18 @@ class ToolCallingDriver implements CanUseTools
             : $this->toolChoice;
         assert(is_string($toolChoice));
 
-        $inference = (new Inference)
-            ->withLLMProvider($this->llm)
-            ->withMessages($messages->toArray())
-            ->withModel($this->model)
-            ->withTools($tools->toToolSchema())
-            ->withToolChoice($toolChoice)
-            ->withResponseFormat($this->responseFormat)
-            ->withOptions(array_merge($this->options, ['parallel_tool_calls' => $this->parallelToolCalls]))
-            ->withOutputMode($this->mode);
-        if ($this->retryPolicy !== null) {
-            $inference = $inference->withRetryPolicy($this->retryPolicy);
-        }
-        if ($this->httpClient !== null) {
-            $inference = $inference->withHttpClient($this->httpClient);
-        }
-        return $inference->create();
+        $request = new InferenceRequest(
+            messages: $messages,
+            model: $this->model,
+            tools: $tools->toToolSchema(),
+            toolChoice: $toolChoice,
+            responseFormat: $this->responseFormat,
+            options: array_merge($this->options, ['parallel_tool_calls' => $this->parallelToolCalls]),
+            mode: $this->mode,
+            retryPolicy: $this->retryPolicy,
+        );
+
+        return $this->inference->create($request);
     }
 
     /** Builds the final ToolUseStep from inference response and executions. */

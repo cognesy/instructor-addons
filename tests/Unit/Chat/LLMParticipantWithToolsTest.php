@@ -18,8 +18,9 @@ use Cognesy\Polyglot\Inference\Data\InferenceResponse;
 use Cognesy\Polyglot\Inference\Data\ToolCall;
 use Cognesy\Polyglot\Inference\Data\Usage;
 use Cognesy\Polyglot\Inference\Enums\InferenceFinishReason;
+use Cognesy\Polyglot\Inference\InferenceRuntime;
 use Cognesy\Polyglot\Inference\LLMProvider;
-use Tests\Addons\Support\FakeInferenceDriver;
+use Tests\Addons\Support\FakeInferenceRequestDriver;
 
 
 function test_add(int $a, int $b): int {
@@ -42,7 +43,7 @@ it('creates participant with correct name and system prompt', function () {
 });
 
 it('executes tool calls and returns chat step with tool results', function () {
-    $driver = new FakeInferenceDriver([
+    $driver = new FakeInferenceRequestDriver([
         new InferenceResponse(
             content: '',
             toolCalls: new ToolCalls(new ToolCall('test_add', ['a' => 5, 'b' => 3])),
@@ -62,7 +63,9 @@ it('executes tool calls and returns chat step with tool results', function () {
     $toolUse = ToolUseFactory::default(
         tools: $tools,
         driver: new ToolCallingDriver(
-            llm: LLMProvider::new()->withDriver($driver)
+            inference: InferenceRuntime::fromProvider(
+                provider: LLMProvider::new()->withDriver($driver),
+            )
         )
     );
 
@@ -88,7 +91,7 @@ it('executes tool calls and returns chat step with tool results', function () {
 });
 
 it('handles multiple tool calls in sequence', function () {
-    $driver = new FakeInferenceDriver([
+    $driver = new FakeInferenceRequestDriver([
         new InferenceResponse(
             content: '',
             toolCalls: new ToolCalls(
@@ -114,7 +117,9 @@ it('handles multiple tool calls in sequence', function () {
     $toolUse = ToolUseFactory::default(
         tools: $tools,
         driver: new ToolCallingDriver(
-            llm: LLMProvider::new()->withDriver($driver)
+            inference: InferenceRuntime::fromProvider(
+                provider: LLMProvider::new()->withDriver($driver),
+            )
         )
     );
 
@@ -137,7 +142,7 @@ it('handles multiple tool calls in sequence', function () {
 });
 
 it('prepends system prompt when provided', function () {
-    $driver = new FakeInferenceDriver([
+    $driver = new FakeInferenceRequestDriver([
         new InferenceResponse(
             content: 'Hello! I am a helpful math assistant.',
             finishReason: 'stop',
@@ -149,7 +154,9 @@ it('prepends system prompt when provided', function () {
     $toolUse = ToolUseFactory::default(
         tools: new Tools(),
         driver: new ToolCallingDriver(
-            llm: LLMProvider::new()->withDriver($driver)
+            inference: InferenceRuntime::fromProvider(
+                provider: LLMProvider::new()->withDriver($driver),
+            )
         )
     );
 
@@ -172,7 +179,7 @@ it('prepends system prompt when provided', function () {
 });
 
 it('works without system prompt', function () {
-    $driver = new FakeInferenceDriver([
+    $driver = new FakeInferenceRequestDriver([
         new InferenceResponse(
             content: 'Hello!',
             toolCalls: new ToolCalls(),
@@ -184,7 +191,9 @@ it('works without system prompt', function () {
     $toolUse = ToolUseFactory::default(
         tools: new Tools(),
         driver: new ToolCallingDriver(
-            llm: LLMProvider::new()->withDriver($driver)
+            inference: InferenceRuntime::fromProvider(
+                provider: LLMProvider::new()->withDriver($driver),
+            )
         )
     );
 
@@ -217,7 +226,7 @@ it('dispatches tool use events', function () {
         $completedEvents[] = $event;
     });
 
-    $driver = new FakeInferenceDriver([
+    $driver = new FakeInferenceRequestDriver([
         new InferenceResponse(
             content: 'Result is ready.',
             toolCalls: new ToolCalls(),
@@ -229,7 +238,9 @@ it('dispatches tool use events', function () {
     $toolUse = ToolUseFactory::default(
         tools: new Tools(),
         driver: new ToolCallingDriver(
-            llm: LLMProvider::new()->withDriver($driver)
+            inference: InferenceRuntime::fromProvider(
+                provider: LLMProvider::new()->withDriver($driver),
+            )
         )
     );
 

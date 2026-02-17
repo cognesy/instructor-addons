@@ -14,10 +14,14 @@ use Cognesy\Addons\ToolUse\Drivers\ReAct\ReActDriver;
 use Cognesy\Addons\ToolUse\Enums\ToolUseStepType;
 use Cognesy\Addons\ToolUse\Tools\FunctionTool;
 use Cognesy\Addons\ToolUse\ToolUseFactory;
+use Cognesy\Events\EventBusResolver;
+use Cognesy\Instructor\Creation\StructuredOutputConfigBuilder;
+use Cognesy\Instructor\StructuredOutputRuntime;
 use Cognesy\Messages\Messages;
 use Cognesy\Polyglot\Inference\Data\InferenceResponse;
+use Cognesy\Polyglot\Inference\InferenceRuntime;
 use Cognesy\Polyglot\Inference\LLMProvider;
-use Tests\Addons\Support\FakeInferenceDriver;
+use Tests\Addons\Support\FakeInferenceRequestDriver;
 
 
 function react_add_numbers(int $a, int $b): int {
@@ -26,6 +30,25 @@ function react_add_numbers(int $a, int $b): int {
 
 function react_subtract_numbers(int $a, int $b): int {
     return $a - $b;
+}
+
+function makeReActDriverFromFake(FakeInferenceRequestDriver $driver, bool $finalViaInference = false): ReActDriver {
+    $events = EventBusResolver::using(null);
+    $inference = InferenceRuntime::fromProvider(
+        provider: LLMProvider::new()->withDriver($driver),
+        events: $events,
+    );
+    $structuredOutput = new StructuredOutputRuntime(
+        inference: $inference,
+        events: $events,
+        config: (new StructuredOutputConfigBuilder())->create(),
+    );
+
+    return new ReActDriver(
+        inference: $inference,
+        structuredOutput: $structuredOutput,
+        finalViaInference: $finalViaInference,
+    );
 }
 
 // Helper function to create default tools and continuation criteria
@@ -52,7 +75,7 @@ describe('ReActDriver Feature Tests', function () {
             // Arrange
             [$tools, $continuationCriteria] = makeToolsAndCriteria();
 
-            $driver = new FakeInferenceDriver([
+            $driver = new FakeInferenceRequestDriver([
                 new InferenceResponse(content: json_encode([
                     'thought' => 'I need to add 2455 and 3558 first',
                     'type' => 'call_tool',
@@ -72,7 +95,7 @@ describe('ReActDriver Feature Tests', function () {
                 ])),
             ]);
 
-            $reactDriver = new ReActDriver(llm: LLMProvider::new()->withDriver($driver));
+            $reactDriver = makeReActDriverFromFake($driver);
             $toolUse = ToolUseFactory::default(
                 tools: $tools,
                 continuationCriteria: $continuationCriteria,
@@ -100,7 +123,7 @@ describe('ReActDriver Feature Tests', function () {
             // Arrange
             [$tools, $continuationCriteria] = makeToolsAndCriteria();
 
-            $driver = new FakeInferenceDriver([
+            $driver = new FakeInferenceRequestDriver([
                 new InferenceResponse(content: json_encode([
                     'thought' => 'I will call a non-existent tool',
                     'type' => 'call_tool',
@@ -115,7 +138,7 @@ describe('ReActDriver Feature Tests', function () {
                 ])),
             ]);
 
-            $reactDriver = new ReActDriver(llm: LLMProvider::new()->withDriver($driver));
+            $reactDriver = makeReActDriverFromFake($driver);
             $toolUse = ToolUseFactory::default(
                 tools: $tools,
                 continuationCriteria: $continuationCriteria,
@@ -147,7 +170,7 @@ describe('ReActDriver Feature Tests', function () {
             // Arrange
             [$tools, $continuationCriteria] = makeToolsAndCriteria();
 
-            $driver = new FakeInferenceDriver([
+            $driver = new FakeInferenceRequestDriver([
                 new InferenceResponse(content: json_encode([
                     'thought' => 'Adding 2455 and 3558',
                     'type' => 'call_tool',
@@ -167,7 +190,7 @@ describe('ReActDriver Feature Tests', function () {
                 ])),
             ]);
 
-            $reactDriver = new ReActDriver(llm: LLMProvider::new()->withDriver($driver));
+            $reactDriver = makeReActDriverFromFake($driver);
             $toolUse = ToolUseFactory::default(
                 tools: $tools,
                 continuationCriteria: $continuationCriteria,
@@ -198,7 +221,7 @@ describe('ReActDriver Feature Tests', function () {
             // Arrange
             [$tools, $continuationCriteria] = makeToolsAndCriteria();
 
-            $driver = new FakeInferenceDriver([
+            $driver = new FakeInferenceRequestDriver([
                 new InferenceResponse(content: json_encode([
                     'thought' => 'Step 1',
                     'type' => 'call_tool',
@@ -212,7 +235,7 @@ describe('ReActDriver Feature Tests', function () {
                 ])),
             ]);
 
-            $reactDriver = new ReActDriver(llm: LLMProvider::new()->withDriver($driver));
+            $reactDriver = makeReActDriverFromFake($driver);
             $toolUse = ToolUseFactory::default(
                 tools: $tools,
                 continuationCriteria: $continuationCriteria,
@@ -239,7 +262,7 @@ describe('ReActDriver Feature Tests', function () {
             // Arrange
             [$tools, $continuationCriteria] = makeToolsAndCriteria();
 
-            $driver = new FakeInferenceDriver([
+            $driver = new FakeInferenceRequestDriver([
                 new InferenceResponse(content: json_encode([
                     'thought' => 'Adding numbers',
                     'type' => 'call_tool',
@@ -259,7 +282,7 @@ describe('ReActDriver Feature Tests', function () {
                 ])),
             ]);
 
-            $reactDriver = new ReActDriver(llm: LLMProvider::new()->withDriver($driver));
+            $reactDriver = makeReActDriverFromFake($driver);
             $toolUse = ToolUseFactory::default(
                 tools: $tools,
                 continuationCriteria: $continuationCriteria,
@@ -282,7 +305,7 @@ describe('ReActDriver Feature Tests', function () {
             // Arrange
             [$tools, $continuationCriteria] = makeToolsAndCriteria();
 
-            $driver = new FakeInferenceDriver([
+            $driver = new FakeInferenceRequestDriver([
                 new InferenceResponse(content: json_encode([
                     'thought' => 'Adding',
                     'type' => 'call_tool',
@@ -298,10 +321,7 @@ describe('ReActDriver Feature Tests', function () {
                 new InferenceResponse(content: 'The calculated result is 150'),
             ]);
 
-            $reactDriver = new ReActDriver(
-                llm: LLMProvider::new()->withDriver($driver),
-                finalViaInference: true,
-            );
+            $reactDriver = makeReActDriverFromFake($driver, finalViaInference: true);
             $toolUse = ToolUseFactory::default(
                 tools: $tools,
                 continuationCriteria: $continuationCriteria,
@@ -323,7 +343,7 @@ describe('ReActDriver Feature Tests', function () {
             // Arrange
             [$tools, $continuationCriteria] = makeToolsAndCriteria();
 
-            $driver = new FakeInferenceDriver([
+            $driver = new FakeInferenceRequestDriver([
                 new InferenceResponse(content: json_encode([
                     'thought' => 'Already have answer',
                     'type' => 'final_answer',
@@ -331,7 +351,7 @@ describe('ReActDriver Feature Tests', function () {
                 ])),
             ]);
 
-            $reactDriver = new ReActDriver(llm: LLMProvider::new()->withDriver($driver));
+            $reactDriver = makeReActDriverFromFake($driver);
             $toolUse = ToolUseFactory::default(
                 tools: $tools,
                 continuationCriteria: $continuationCriteria,
@@ -372,8 +392,8 @@ describe('ReActDriver Feature Tests', function () {
 
             // Pattern 1: Manual control
             [$tools1, $criteria1] = makeToolsAndCriteria();
-            $driver1 = new FakeInferenceDriver($mockResponses);
-            $reactDriver1 = new ReActDriver(llm: LLMProvider::new()->withDriver($driver1));
+            $driver1 = new FakeInferenceRequestDriver($mockResponses);
+            $reactDriver1 = makeReActDriverFromFake($driver1);
             $toolUse1 = ToolUseFactory::default(
                 tools: $tools1,
                 continuationCriteria: $criteria1,
@@ -387,8 +407,8 @@ describe('ReActDriver Feature Tests', function () {
 
             // Pattern 2: Iterator
             [$tools2, $criteria2] = makeToolsAndCriteria();
-            $driver2 = new FakeInferenceDriver($mockResponses);
-            $reactDriver2 = new ReActDriver(llm: LLMProvider::new()->withDriver($driver2));
+            $driver2 = new FakeInferenceRequestDriver($mockResponses);
+            $reactDriver2 = makeReActDriverFromFake($driver2);
             $toolUse2 = ToolUseFactory::default(
                 tools: $tools2,
                 continuationCriteria: $criteria2,
@@ -402,8 +422,8 @@ describe('ReActDriver Feature Tests', function () {
 
             // Pattern 3: Final step
             [$tools3, $criteria3] = makeToolsAndCriteria();
-            $driver3 = new FakeInferenceDriver($mockResponses);
-            $reactDriver3 = new ReActDriver(llm: LLMProvider::new()->withDriver($driver3));
+            $driver3 = new FakeInferenceRequestDriver($mockResponses);
+            $reactDriver3 = makeReActDriverFromFake($driver3);
             $toolUse3 = ToolUseFactory::default(
                 tools: $tools3,
                 continuationCriteria: $criteria3,
