@@ -8,7 +8,7 @@ use Cognesy\Polyglot\Inference\Data\InferenceRequest;
 use Cognesy\Polyglot\Inference\Data\InferenceResponse;
 use Cognesy\Polyglot\Inference\Data\PartialInferenceResponse;
 
-class FakeInferenceRequestDriver implements CanProcessInferenceRequest
+class FakeInferenceDriver implements CanProcessInferenceRequest
 {
     /** @var InferenceResponse[] */
     private array $responses;
@@ -37,13 +37,31 @@ class FakeInferenceRequestDriver implements CanProcessInferenceRequest
     {
         $this->streamCalls++;
         $batch = !empty($this->streamBatches) ? array_shift($this->streamBatches) : [];
-        foreach ($batch as $item) {
-            yield $item;
-        }
+        yield from $this->emitAccumulatedBatch($batch);
     }
 
     public function capabilities(?string $model = null): DriverCapabilities
     {
         return new DriverCapabilities();
+    }
+
+    /** @param PartialInferenceResponse[] $batch */
+    private function emitAccumulatedBatch(array $batch): iterable
+    {
+        $previous = PartialInferenceResponse::empty();
+        foreach ($batch as $item) {
+            $current = $this->isAccumulated($item)
+                ? $item
+                : $item->withAccumulatedContent($previous);
+            $previous = $current;
+            yield $current;
+        }
+    }
+
+    private function isAccumulated(PartialInferenceResponse $item): bool
+    {
+        return $item->hasContent()
+            || $item->hasReasoningContent()
+            || $item->toolCalls()->hasAny();
     }
 }
